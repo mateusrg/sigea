@@ -6,6 +6,11 @@ export const colors = {
     lightGray: "#E2E8F0",
     green: '#2F855A',
     orange: '#DD6B20',
-    red: '#E53E3E',
-    lightBlue: '#3182CE'
+    red: '#D32F2F',
+    lightBlue: '#3182CE',
+    inputBg: '#f1f4ff',
+    mediumGray: '#626262',
+    linkGray: '#494949',
+    black: '#000',
+    white: '#fff'
 }
