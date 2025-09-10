@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, View, ActivityIndicator } from 'react-native';
+import { Provider as PaperProvider } from 'react-native-paper';
 import AppNavigator from './src/navigation/AppNavigator';
 import LoginScreen from './src/screens/LoginScreen';
 
@@ -120,18 +121,38 @@ export default function App() {
 
   
   const [userProfile, setUserProfile] = useState(null);
-  
+
+  React.useEffect(() => {
+    const usuarioSalvo = localStorage.getItem('user');
+    if (usuarioSalvo) {
+      try {
+        const objetoUsuario = JSON.parse(usuarioSalvo);
+        let papelString = 'aluno';
+        if (objetoUsuario.papel === 1) papelString = 'admin';
+        else if (objetoUsuario.papel === 2) papelString = 'professor';
+        setUserProfile(papelString);
+      } catch (e) {
+        localStorage.removeItem('user');
+        localStorage.removeItem('token');
+      }
+    }
+  }, []);
+
   if (!fontsLoaded) {
     return <ActivityIndicator size="large" style={{ flex: 1 }} />;
   }
-  
+
   return (
     <View style={styles.container}>
       <StatusBar style="auto" />
       {!userProfile ? (
-        <LoginScreen setUserProfile={setUserProfile} />
+        <PaperProvider>
+          <LoginScreen setUserProfile={setUserProfile} />
+        </PaperProvider>
       ) : (
-        <AppNavigator userProfile={userProfile} />
+        <PaperProvider>
+          <AppNavigator userProfile={userProfile} />
+        </PaperProvider>
       )}
     </View>
   );

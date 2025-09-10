@@ -1,4 +1,3 @@
-// src/navigation/AppNavigator.js
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
@@ -11,7 +10,6 @@ import AlunoDashboard from '../screens/Aluno/AlunoDashboard';
 const Stack = createStackNavigator();
 
 export default function AppNavigator({ userProfile }) {
-  // userProfile: 'admin' | 'professor' | 'aluno' | null
   return (
     <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
