@@ -15,7 +15,7 @@ export default function AppNavigator({ userProfile }) {
   return (
     <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
-        {!userProfile ? (
+        {/* {!userProfile ? (
           <Stack.Screen name="Login" component={LoginScreen} />
         ) : userProfile === 'admin' ? (
           <Stack.Screen name="AdminDashboard" component={AdminDashboard} />
@@ -23,7 +23,8 @@ export default function AppNavigator({ userProfile }) {
           <Stack.Screen name="ProfessorDashboard" component={ProfessorDashboard} />
         ) : (
           <Stack.Screen name="AlunoDashboard" component={AlunoDashboard} />
-        )}
+        )} */}
+        <Stack.Screen name="AlunoDashboard" component={AlunoDashboard} />
       </Stack.Navigator>
     </NavigationContainer>
   );
