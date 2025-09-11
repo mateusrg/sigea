@@ -11,6 +11,7 @@ export const colors = {
     inputBg: '#f1f4ff',
     mediumGray: '#626262',
     linkGray: '#494949',
+    variantGray: '#1f2937',
     black: '#000',
     white: '#fff'
 }
