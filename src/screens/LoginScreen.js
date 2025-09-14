@@ -101,7 +101,7 @@ export default function LoginScreen({ navigation, setUserProfile }) {
                 resizeMode="cover"
             />
             <View style={styles.container}>
-                <PaperText style={styles.title}>Login</PaperText>
+                <PaperText style={styles.title}>Eduteca</PaperText>
                 <PaperText style={styles.subtitle}>Seja bem-vindo de volta! Entre em sua conta</PaperText>
                 <View style={styles.entornoInput}>
                     <PaperTextInput
@@ -133,33 +133,35 @@ export default function LoginScreen({ navigation, setUserProfile }) {
                         {emailError}
                     </HelperText>
                 </View>
-                <PaperTextInput
-                    label={<PaperText style={{ color: colors.mediumGray }}>Senha</PaperText>}
-                    mode="outlined"
-                    textColor="black"
-                    secureTextEntry
-                    maxLength={255}
-                    theme={{
-                        roundness: 10,
-                        colors: {
-                            primary: colors.blue,
-                            outline: passwordError ? colors.red : colors.blue,
-                            text: colors.black,
-                        },
-                    }}
-                    style={[styles.input]}
-                    value={password}
-                    onChangeText={(text) => {
-                        setPassword(text);
-                        if (passwordError) setPasswordError('');
-                    }}
-                    onBlur={() => setPasswordError(validatePassword(password))}
-                    error={!!passwordError}
-                    onSubmitEditing={handleLogin}
-                />
-                <HelperText type="error" visible={!!passwordError || !!backendError} style={styles.helperText}>
-                    {passwordError || backendError}
-                </HelperText>
+                <View style={styles.entornoInput}>
+                    <PaperTextInput
+                        label={<PaperText style={{ color: colors.mediumGray }}>Senha</PaperText>}
+                        mode="outlined"
+                        textColor="black"
+                        secureTextEntry
+                        maxLength={255}
+                        theme={{
+                            roundness: 10,
+                            colors: {
+                                primary: colors.blue,
+                                outline: passwordError ? colors.red : colors.blue,
+                                text: colors.black,
+                            },
+                        }}
+                        style={[styles.input]}
+                        value={password}
+                        onChangeText={(text) => {
+                            setPassword(text);
+                            if (passwordError) setPasswordError('');
+                        }}
+                        onBlur={() => setPasswordError(validatePassword(password))}
+                        error={!!passwordError}
+                        onSubmitEditing={handleLogin}
+                    />
+                    <HelperText type="error" visible={!!passwordError || !!backendError} style={styles.helperText}>
+                        {passwordError || backendError}
+                    </HelperText>
+                </View>
                 <PaperButton
                     mode="elevated"
                     onPress={handleLogin}
@@ -173,7 +175,7 @@ export default function LoginScreen({ navigation, setUserProfile }) {
                     {loading
                         ? <View style={{ alignItems: 'center', justifyContent: 'center', width: '100%' }}>
                             <ActivityIndicator animating={true} color={colors.white} size={24} />
-                          </View>
+                        </View>
                         : 'Entrar'
                     }
                 </PaperButton>
@@ -224,12 +226,14 @@ export default function LoginScreen({ navigation, setUserProfile }) {
 }
 
 const styles = StyleSheet.create({
+    entornoInput: {
+        height: 80,
+    },
     helperText: {
         fontFamily: fontFamily.poppins.medium,
         fontSize: 10,
         color: colors.red,
-        marginTop: -12,
-        marginBottom: 8,
+        marginTop: -20,
     },
     csdImage: {
         position: 'absolute',
