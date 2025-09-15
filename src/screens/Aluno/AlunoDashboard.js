@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, FlatList } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, FlatList, Modal, useWindowDimensions } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Calendar, LocaleConfig } from 'react-native-calendars';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { fontFamily } from '../../styles/fontFamily';
 import { colors } from '../../styles/colors';
-import { HouseIcon, ChalkboardTeacherIcon, ClipboardTextIcon, NoteIcon, SignOutIcon, UserCircleIcon } from 'phosphor-react-native';
+import { HouseIcon, ChalkboardTeacherIcon, NoteIcon, SignOutIcon, UserCircleIcon } from 'phosphor-react-native';
+import { useNavigation } from '@react-navigation/native';
 
 const interFont = fontFamily?.inter?.regular || fontFamily?.poppins?.regular || 'System';
 const larguraSidebar = 220;
@@ -40,6 +41,9 @@ export default function AlunoDashboard() {
     return `${year}-${month}-${day}`;
   })();
   const [selectedDate, setSelectedDate] = useState(hoje);
+  const [logoutModalVisible, setLogoutModalVisible] = useState(false);
+  const { width } = useWindowDimensions();
+  const navigation = useNavigation();
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -55,6 +59,16 @@ export default function AlunoDashboard() {
     };
     fetchUser();
   }, []);
+
+  const handleLogout = async () => {
+    setLogoutModalVisible(false);
+    await AsyncStorage.removeItem('user');
+    await AsyncStorage.removeItem('token');
+    navigation.reset({
+      index: 0,
+      routes: [{ name: 'Login' }],
+    });
+  };
 
   const markedDates = {
     ...fixedMarkedDates,
@@ -102,13 +116,16 @@ export default function AlunoDashboard() {
     }
   };
 
-
   const dashboardCards = [
     { label: "Minha Turma", value: "Turma 101" },
     { label: "Próxima Aula", value: "Matemática - 10:00" },
     { label: "Total de Aulas", value: "32" },
     { label: "Aulas Assistidas", value: "28" },
   ];
+
+  let numColumns = 1;
+  if (width >= 1600) numColumns = 4;
+  else if (width >= 750) numColumns = 2;
 
   return (
     <SafeAreaProvider>
@@ -126,13 +143,12 @@ export default function AlunoDashboard() {
                 <Text style={styles.logoText}>Eduteca</Text>
               </View>
               <View style={styles.sidebarNav}>
-                <SidebarButton label="Dashboard" active icon={<HouseIcon size={22} weight="regular" color="#374151" />} />
-                <SidebarButton label="Aulas" icon={<ChalkboardTeacherIcon size={22} weight="regular" color="#374151" />} />
-                <SidebarButton label="Notas" icon={<NoteIcon size={22} weight="regular" color="#374151" />} />
+                <SidebarButton label="Dashboard" active icon={<HouseIcon size={22} weight="regular" color="#374151" />} onPress={() => navigation.navigate('AlunoDashboard')} />
+                <SidebarButton label="Notas" icon={<NoteIcon size={22} weight="regular" color="#374151" />} onPress={() => navigation.navigate('NotasAlunoScreen')} />
               </View>
             </View>
             <View style={styles.sidebarBottom}>
-              <SidebarButton label="Sair" icon={<SignOutIcon size={22} weight="regular" color="#374151" />} />
+              <SidebarButton label="Sair" icon={<SignOutIcon size={22} weight="regular" color="#374151" />} onPress={() => setLogoutModalVisible(true)} />
             </View>
           </View>
 
@@ -155,10 +171,15 @@ export default function AlunoDashboard() {
               <FlatList
                 data={dashboardCards}
                 keyExtractor={(_, idx) => idx.toString()}
-                numColumns={2}
+                numColumns={numColumns}
+                key={numColumns}
                 contentContainerStyle={styles.cardsRow}
-                renderItem={({ item }) => <DashboardCard label={item.label} value={item.value} />}
-                columnWrapperStyle={{ gap: 16 }}
+                renderItem={({ item }) => (
+                  <DashboardCard label={item.label} value={item.value} />
+                )}
+                columnWrapperStyle={numColumns > 1 ? { gap: 16 } : undefined}
+                showsVerticalScrollIndicator={false}
+                scrollEnabled={false}
               />
 
               <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
@@ -195,15 +216,54 @@ export default function AlunoDashboard() {
               </View>
             </ScrollView>
           </View>
+          {/* Logout Modal */}
+          <Modal
+            visible={logoutModalVisible}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setLogoutModalVisible(false)}
+          >
+            <View style={{
+              flex: 1,
+              backgroundColor: 'rgba(0,0,0,0.3)',
+              justifyContent: 'center',
+              alignItems: 'center'
+            }}>
+              <View style={{
+                backgroundColor: '#fff',
+                borderRadius: 12,
+                padding: 24,
+                alignItems: 'center',
+                width: 320
+              }}>
+                <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 12 }}>Confirmar Logout</Text>
+                <Text style={{ fontSize: 15, color: '#374151', marginBottom: 24 }}>Tem certeza que deseja sair?</Text>
+                <View style={{ flexDirection: 'row', gap: 16 }}>
+                  <TouchableOpacity
+                    style={{ backgroundColor: '#e5e7eb', padding: 10, borderRadius: 8, minWidth: 80, alignItems: 'center' }}
+                    onPress={() => setLogoutModalVisible(false)}
+                  >
+                    <Text style={{ color: '#374151', fontWeight: 'bold' }}>Cancelar</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={{ backgroundColor: '#ef4444', padding: 10, borderRadius: 8, minWidth: 80, alignItems: 'center' }}
+                    onPress={handleLogout}
+                  >
+                    <Text style={{ color: '#fff', fontWeight: 'bold' }}>Sair</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
         </View>
       </SafeAreaView>
     </SafeAreaProvider>
   );
 }
 
-function SidebarButton({ label, icon, active }) {
+function SidebarButton({ label, icon, active, onPress }) {
   return (
-    <TouchableOpacity style={[styles.sidebarBtn, active && styles.sidebarBtnActive]}>
+    <TouchableOpacity style={[styles.sidebarBtn, active && styles.sidebarBtnActive]} onPress={onPress}>
       <View style={[styles.sidebarBtnIcon, active && styles.sidebarBtnIconActive]}>{icon}</View>
       <Text style={[styles.sidebarBtnText, active && styles.sidebarBtnTextActive]}>{label}</Text>
     </TouchableOpacity>

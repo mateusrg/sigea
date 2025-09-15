@@ -8,8 +8,15 @@ import { HouseIcon, ChalkboardTeacherIcon, UserCircleIcon, SignOutIcon, Clipboar
 
 const larguraSidebar = 220;
 
+import { useWindowDimensions } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { Modal } from 'react-native';
+
 export default function AdminDashboard() {
   const [userName, setUserName] = useState('');
+  const { width } = useWindowDimensions();
+  const navigation = useNavigation();
+  const [logoutModalVisible, setLogoutModalVisible] = useState(false);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -31,8 +38,22 @@ export default function AdminDashboard() {
     { label: "Total de Professores", value: "8" },
     { label: "Total de Alunos", value: "120" },
     { label: "Alunos Ativos Hoje", value: "102" },
-    { label: "Turma com mais alunos", value: "Turma 3 (25)" },
+    { label: "Turma com mais alunos", value: "Turma 101 (25)" },
   ];
+
+  const handleLogout = async () => {
+    setLogoutModalVisible(false);
+    await AsyncStorage.removeItem('user');
+    await AsyncStorage.removeItem('token');
+    navigation.reset({
+      index: 0,
+      routes: [{ name: 'Login' }],
+    });
+  };
+
+  let numColumns = 1;
+  if (width >= 1600) numColumns = 4;
+  else if (width >= 750) numColumns = 2;
 
   return (
     <SafeAreaProvider>
@@ -50,14 +71,14 @@ export default function AdminDashboard() {
                 <Text style={styles.logoText}>Eduteca</Text>
               </View>
               <View style={styles.sidebarNav}>
-                <SidebarButton label="Dashboard" active icon={<HouseIcon size={22} weight="regular" color="#374151" />} />
-                <SidebarButton label="Turmas" icon={<ClipboardTextIcon size={22} weight="regular" color="#374151" />} />
-                <SidebarButton label="Professores" icon={<ChalkboardTeacherIcon size={22} weight="regular" color="#374151" />} />
-                <SidebarButton label="Alunos" icon={<UserCircleIcon size={22} weight="regular" color="#374151" />} />
+                <SidebarButton label="Dashboard" active icon={<HouseIcon size={22} weight="regular" color="#374151" />} onPress={() => navigation.navigate("AdminDashboard")} />
+                <SidebarButton label="Turmas" icon={<ClipboardTextIcon size={22} weight="regular" color="#374151" />} onPress={() => navigation.navigate("TurmasScreen")} />
+                <SidebarButton label="Professores" icon={<ChalkboardTeacherIcon size={22} weight="regular" color="#374151" />} onPress={() => navigation.navigate("ProfessoresScreen")} />
+                <SidebarButton label="Alunos" icon={<UserCircleIcon size={22} weight="regular" color="#374151" />} onPress={() => navigation.navigate("AlunosScreen")} />
               </View>
             </View>
             <View style={styles.sidebarBottom}>
-              <SidebarButton label="Sair" icon={<SignOutIcon size={22} weight="regular" color="#374151" />} />
+              <SidebarButton label="Sair" icon={<SignOutIcon size={22} weight="regular" color="#374151" />} onPress={() => setLogoutModalVisible(true)} />
             </View>
           </View>
 
@@ -80,22 +101,66 @@ export default function AdminDashboard() {
               <FlatList
                 data={dashboardCards}
                 keyExtractor={(_, idx) => idx.toString()}
-                numColumns={2}
+                numColumns={numColumns}
+                key={numColumns}
                 contentContainerStyle={styles.cardsRow}
-                renderItem={({ item }) => <DashboardCard label={item.label} value={item.value} />}
-                columnWrapperStyle={{ gap: 16 }}
+                renderItem={({ item }) => (
+                  <DashboardCard label={item.label} value={item.value} />
+                )}
+                columnWrapperStyle={numColumns > 1 ? { gap: 16 } : undefined}
+                showsVerticalScrollIndicator={false}
+                scrollEnabled={false}
               />
             </ScrollView>
           </View>
+          {/* Logout Modal */}
+          <Modal
+            visible={logoutModalVisible}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setLogoutModalVisible(false)}
+          >
+            <View style={{
+              flex: 1,
+              backgroundColor: 'rgba(0,0,0,0.3)',
+              justifyContent: 'center',
+              alignItems: 'center'
+            }}>
+              <View style={{
+                backgroundColor: '#fff',
+                borderRadius: 12,
+                padding: 24,
+                alignItems: 'center',
+                width: 320
+              }}>
+                <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 12 }}>Confirmar Logout</Text>
+                <Text style={{ fontSize: 15, color: '#374151', marginBottom: 24 }}>Tem certeza que deseja sair?</Text>
+                <View style={{ flexDirection: 'row', gap: 16 }}>
+                  <TouchableOpacity
+                    style={{ backgroundColor: '#e5e7eb', padding: 10, borderRadius: 8, minWidth: 80, alignItems: 'center' }}
+                    onPress={() => setLogoutModalVisible(false)}
+                  >
+                    <Text style={{ color: '#374151', fontWeight: 'bold' }}>Cancelar</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={{ backgroundColor: '#ef4444', padding: 10, borderRadius: 8, minWidth: 80, alignItems: 'center' }}
+                    onPress={handleLogout}
+                  >
+                    <Text style={{ color: '#fff', fontWeight: 'bold' }}>Sair</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
         </View>
       </SafeAreaView>
     </SafeAreaProvider>
   );
 }
 
-function SidebarButton({ label, icon, active }) {
+function SidebarButton({ label, icon, active, onPress }) {
   return (
-    <TouchableOpacity style={[styles.sidebarBtn, active && styles.sidebarBtnActive]}>
+    <TouchableOpacity style={[styles.sidebarBtn, active && styles.sidebarBtnActive]} onPress={onPress}>
       <View style={[styles.sidebarBtnIcon, active && styles.sidebarBtnIconActive]}>{icon}</View>
       <Text style={[styles.sidebarBtnText, active && styles.sidebarBtnTextActive]}>{label}</Text>
     </TouchableOpacity>
