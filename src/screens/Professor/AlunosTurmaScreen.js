@@ -7,7 +7,6 @@ export default function AlunosTurmaScreen({ turmaId }) {
   const [alunos, setAlunos] = useState([]);
 
   useEffect(() => {
-    // Fetch alunos enrolled in turmaId
     const unsubscribe = db.collection('alunos')
       .where('turmaId', '==', turmaId)
       .onSnapshot(snapshot => {

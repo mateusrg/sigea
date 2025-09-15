@@ -151,7 +151,7 @@ export default function App() {
         </PaperProvider>
       ) : (
         <PaperProvider>
-          <AppNavigator userProfile={userProfile} />
+          <AppNavigator userProfile={userProfile} setUserProfile={setUserProfile} />
         </PaperProvider>
       )}
     </View>

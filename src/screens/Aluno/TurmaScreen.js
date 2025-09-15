@@ -7,7 +7,6 @@ export default function TurmaScreen({ alunoId }) {
   const [turma, setTurma] = useState(null);
 
   useEffect(() => {
-    // Fetch turma for alunoId
     const fetchTurma = async () => {
       const alunoDoc = await db.collection('alunos').doc(alunoId).get();
       const turmaId = alunoDoc.exists ? alunoDoc.data().turmaId : null;
