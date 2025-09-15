@@ -18,7 +18,12 @@ export default function AppNavigator({ userProfile, setUserProfile }) {
             {props => <LoginScreen {...props} setUserProfile={setUserProfile} />}
           </Stack.Screen>
         ) : userProfile === 'admin' ? (
-          <Stack.Screen name="AdminDashboard" component={AdminDashboard} />
+          <>
+            <Stack.Screen name="AdminDashboard" component={AdminDashboard} />
+            <Stack.Screen name="AlunosScreen" component={require('../screens/Admin/AlunosScreen').default} />
+            <Stack.Screen name="ProfessoresScreen" component={require('../screens/Admin/ProfessoresScreen').default} />
+            <Stack.Screen name="TurmasScreen" component={require('../screens/Admin/TurmasScreen').default} />
+          </>
         ) : userProfile === 'professor' ? (
           <>
             <Stack.Screen name="ProfessorDashboard">
@@ -30,7 +35,10 @@ export default function AppNavigator({ userProfile, setUserProfile }) {
             <Stack.Screen name="AlunosTurmaScreen" component={require('../screens/Professor/AlunosTurmaScreen').default} />
           </>
         ) : (
-          <Stack.Screen name="AlunoDashboard" component={AlunoDashboard} />
+          <>
+            <Stack.Screen name="AlunoDashboard" component={AlunoDashboard} />
+            <Stack.Screen name="NotasAlunoScreen" component={require('../screens/Aluno/NotasAlunoScreen').default} />
+          </>
         )}
       </Stack.Navigator>
     </NavigationContainer>
