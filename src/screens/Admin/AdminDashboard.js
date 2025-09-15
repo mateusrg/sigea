@@ -6,7 +6,6 @@ export default function AdminDashboard() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Painel do Administrador</Text>
-      {/* Links to Turmas, Professores, Alunos */}
     </View>
   );
 }

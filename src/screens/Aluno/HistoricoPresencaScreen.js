@@ -7,7 +7,6 @@ export default function HistoricoPresencaScreen({ alunoId }) {
   const [historico, setHistorico] = useState([]);
 
   useEffect(() => {
-    // Fetch attendance history for alunoId
     const unsubscribe = db.collection('presencas')
       .where('alunoId', '==', alunoId)
       .orderBy('data', 'desc')

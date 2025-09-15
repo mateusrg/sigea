@@ -15,12 +15,15 @@ const upcomingClasses = [
 const larguraSidebar = 220;
 
 import { useWindowDimensions } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { Modal } from 'react-native';
 
 export default function ProfessorDashboard() {
   const [userName, setUserName] = useState('');
   const { width } = useWindowDimensions();
+  const navigation = useNavigation();
+  const [logoutModalVisible, setLogoutModalVisible] = useState(false);
 
-  // Responsive columns: 1 (xs), 2 (md), 4 (xxl)
   let numColumns = 1;
   if (width >= 1600) numColumns = 4;
   else if (width >= 750) numColumns = 2;
@@ -58,10 +61,8 @@ export default function ProfessorDashboard() {
   return (
     <View style={styles.root}>
       <View style={styles.container}>
-        {/* Sidebar */}
         <View style={styles.sidebar}>
           <View>
-
             <View style={styles.logoRow}>
               <Image
                 source={require('../../../assets/logo-simplificado.png')}
@@ -71,19 +72,17 @@ export default function ProfessorDashboard() {
               <Text style={styles.logoText}>Eduteca</Text>
             </View>
             <View style={styles.sidebarNav}>
-              <SidebarButton label="Dashboard" active icon={<HouseIcon size={22} weight="regular" color="#374151" />} />
-              <SidebarButton label="Aulas" icon={<ChalkboardTeacherIcon size={22} weight="regular" color="#374151" />} />
-              <SidebarButton label="Chamada" icon={<ClipboardTextIcon size={22} weight="regular" color="#374151" />} />
-              <SidebarButton label="Notas" icon={<NoteIcon size={22} weight="regular" color="#374151" />} />
+              <SidebarButton label="Dashboard" active icon={<HouseIcon size={22} weight="regular" color="#374151" />} onPress={() => navigation.navigate('ProfessorDashboard')} />
+              <SidebarButton label="Aulas" icon={<ChalkboardTeacherIcon size={22} weight="regular" color="#374151" />} onPress={() => navigation.navigate('TurmasScreen')} />
+              <SidebarButton label="Chamada" icon={<ClipboardTextIcon size={22} weight="regular" color="#374151" />} onPress={() => navigation.navigate('PresencaScreen')} />
+              <SidebarButton label="Notas" icon={<NoteIcon size={22} weight="regular" color="#374151" />} onPress={() => navigation.navigate('NotasScreen')} />
             </View>
           </View>
           <View style={styles.sidebarBottom}>
-            <SidebarButton label="Sair" icon={<SignOutIcon size={22} weight="regular" color="#374151" />} />
+            <SidebarButton label="Sair" icon={<SignOutIcon size={22} weight="regular" color="#374151" />} onPress={() => setLogoutModalVisible(true)} />
           </View>
         </View>
-        {/* Main Content */}
         <View style={styles.main}>
-          {/* Header */}
           <View style={styles.header}>
             <Text style={styles.headerTitle}>Bem-vindo(a), {userName.split(' ')[0]}!</Text>
             <View style={styles.headerRight}>
@@ -96,13 +95,12 @@ export default function ProfessorDashboard() {
               </View>
             </View>
           </View>
-          {/* Dashboard Cards */}
           <ScrollView style={styles.scrollArea} contentContainerStyle={{ paddingBottom: 24 }}>
             <FlatList
               data={dashboardCards}
               keyExtractor={(_, idx) => idx.toString()}
               numColumns={numColumns}
-              key={numColumns} // Force re-render when numColumns changes
+              key={numColumns}
               contentContainerStyle={styles.cardsRow}
               renderItem={({ item }) => (
                 <DashboardCard label={item.label} value={item.value} />
@@ -138,14 +136,61 @@ export default function ProfessorDashboard() {
             </View>
           </ScrollView>
         </View>
+        <Modal
+          visible={logoutModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setLogoutModalVisible(false)}
+        >
+          <View style={{
+            flex: 1,
+            backgroundColor: 'rgba(0,0,0,0.3)',
+            justifyContent: 'center',
+            alignItems: 'center'
+          }}>
+            <View style={{
+              backgroundColor: '#fff',
+              borderRadius: 12,
+              padding: 24,
+              alignItems: 'center',
+              width: 320
+            }}>
+              <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 12 }}>Confirmar Logout</Text>
+              <Text style={{ fontSize: 15, color: '#374151', marginBottom: 24 }}>Tem certeza que deseja sair?</Text>
+              <View style={{ flexDirection: 'row', gap: 16 }}>
+                <TouchableOpacity
+                  style={{ backgroundColor: '#e5e7eb', padding: 10, borderRadius: 8, minWidth: 80, alignItems: 'center' }}
+                  onPress={() => setLogoutModalVisible(false)}
+                >
+                  <Text style={{ color: '#374151', fontWeight: 'bold' }}>Cancelar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={{ backgroundColor: '#ef4444', padding: 10, borderRadius: 8, minWidth: 80, alignItems: 'center' }}
+                  onPress={() => {
+                    setLogoutModalVisible(false);
+                    AsyncStorage.removeItem('user');
+                    AsyncStorage.removeItem('token');
+                    if (typeof setUserProfile === 'function') setUserProfile(null);
+                    navigation.reset({
+                      index: 0,
+                      routes: [{ name: 'Login' }],
+                    });
+                  }}
+                >
+                  <Text style={{ color: '#fff', fontWeight: 'bold' }}>Sair</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </View>
     </View>
   );
 }
 
-function SidebarButton({ label, icon, active }) {
+function SidebarButton({ label, icon, active, onPress }) {
   return (
-    <TouchableOpacity style={[styles.sidebarBtn, active && styles.sidebarBtnActive]}>
+    <TouchableOpacity style={[styles.sidebarBtn, active && styles.sidebarBtnActive]} onPress={onPress}>
       <View style={[styles.sidebarBtnIcon, active && styles.sidebarBtnIconActive]}>{icon}</View>
       <Text style={[styles.sidebarBtnText, active && styles.sidebarBtnTextActive]}>{label}</Text>
     </TouchableOpacity>

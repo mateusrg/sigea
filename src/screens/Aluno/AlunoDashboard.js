@@ -6,7 +6,6 @@ export default function AlunoDashboard() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Painel do Aluno</Text>
-      {/* Links to Turma, Histórico de Presença, Notas */}
     </View>
   );
 }

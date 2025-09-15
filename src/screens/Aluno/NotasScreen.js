@@ -7,7 +7,6 @@ export default function NotasScreen({ alunoId }) {
   const [notas, setNotas] = useState([]);
 
   useEffect(() => {
-    // Fetch grades for alunoId
     const unsubscribe = db.collection('notas')
       .where('alunoId', '==', alunoId)
       .onSnapshot(snapshot => {
