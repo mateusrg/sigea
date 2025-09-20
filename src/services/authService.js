@@ -268,11 +268,10 @@ export async function criarAluno(nome, email, senha) {
 
     await db.collection('users').doc(uid).set({
       nome: nome,
-      email: email,
       papel: 3
     });
 
-    return { id: uid, nome, email };
+    return { id: uid, nome };
   } catch (error) {
     console.error('Erro ao criar aluno:', error);
     throw error;
@@ -344,16 +343,30 @@ export async function adicionarAlunoNaTurma(idTurma, idAluno) {
   }
 }
 
+export async function removerAlunoDeTurmas(idAluno) {
+  try {
+    const turmasSnap = await db.collection('turmas').get();
+    for (const turmaDoc of turmasSnap.docs) {
+      const alunoRef = turmaDoc.ref.collection('alunos').doc(idAluno);
+      const alunoDoc = await alunoRef.get();
+      if (alunoDoc.exists) {
+        await alunoRef.delete();
+      }
+    }
+    return true;
+  } catch (error) {
+    console.error('Erro ao remover aluno das turmas:', error);
+    throw error;
+  }
+}
+
 export async function getDashboardCounts() {
-  // Total de turmas
   const turmasSnap = await db.collection('turmas').get();
   const totalTurmas = turmasSnap.size;
 
-  // Total de professores
   const professoresSnap = await db.collection('users').where('papel', '==', 2).get();
   const totalProfessores = professoresSnap.size;
 
-  // Total de alunos
   const alunosSnap = await db.collection('users').where('papel', '==', 3).get();
   const totalAlunos = alunosSnap.size;
 
@@ -379,7 +392,7 @@ export async function getTurmaComMaisAlunos() {
 
 export async function getAlunosAtivosHoje() {
   const turmasSnap = await db.collection('turmas').get();
-  const hoje = new Date().toISOString().split('T')[0]; // "YYYY-MM-DD"
+  const hoje = new Date().toISOString().split('T')[0];
   let totalAtivos = 0;
 
   for (const turmaDoc of turmasSnap.docs) {
@@ -396,6 +409,81 @@ export async function getAlunosAtivosHoje() {
   }
 
   return totalAtivos;
+}
+
+export async function getAlunoIdPorNome(nome) {
+  const snapshot = await db.collection('users')
+    .where('nome', '==', nome)
+    .where('papel', '==', 3)
+    .get();
+
+  if (snapshot.empty) {
+    return null;
+  }
+
+  return snapshot.docs[0].id;
+}
+
+export async function getPresencasAluno(alunoId) {
+  const turmasSnap = await db.collection('turmas').get();
+
+  const presencas = [];
+
+  for (const turmaDoc of turmasSnap.docs) {
+    const turmaData = turmaDoc.data();
+
+    const alunosSnap = await turmaDoc.ref
+      .collection('alunos')
+      .where('idAluno', '==', alunoId)
+      .get();
+
+    if (alunosSnap.empty) continue;
+
+    const chamadasSnap = await turmaDoc.ref.collection('chamadas').get();
+
+    chamadasSnap.forEach(chamadaDoc => {
+      const chamada = chamadaDoc.data();
+      const presencaAluno = chamada.presencas?.[alunoId];
+
+      presencas.push({
+        data: chamada.data,
+        status: presencaAluno === true ? 'Presente' :
+          presencaAluno === false ? 'Falta' : null,
+        turma: turmaData.nome,
+        obs: null,
+        professor: chamada.professorNome || null
+      });
+    });
+  }
+
+  presencas.sort((a, b) => new Date(b.data) - new Date(a.data));
+
+  return presencas;
+}
+
+export async function getNotasAluno(idAluno) {
+  const turmasSnap = await db.collection('turmas').get();
+  const notas = [];
+
+  for (const turmaDoc of turmasSnap.docs) {
+    const notasSnap = await turmaDoc.ref
+      .collection('notas')
+      .where('idAluno', '==', idAluno)
+      .get();
+
+    notasSnap.forEach(doc => {
+      const data = doc.data();
+      notas.push({
+        id: doc.id,
+        nota: data.nota,
+        valor: data.valor === undefined ? null : data.valor,
+        turma: turmaDoc.data().nome
+      });
+    });
+  }
+
+  notas.sort((a, b) => (a.nota || 0) - (b.nota || 0));
+  return notas.slice(0, 8);
 }
 
 export function logout() {

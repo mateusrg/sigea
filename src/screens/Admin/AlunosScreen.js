@@ -8,7 +8,7 @@ import { colors } from '../../styles/colors';
 import { Picker } from '@react-native-picker/picker';
 import { HouseIcon, ChalkboardTeacherIcon, UserCircleIcon, SignOutIcon, ClipboardTextIcon, StackPlusIcon, PlusCircleIcon, MinusCircleIcon } from 'phosphor-react-native';
 
-import { getAlunos, criarAluno, editarAluno, excluirAluno, nomeAlunoExiste, adicionarAlunoNaTurma, getTurmas } from '../../services/authService';
+import { getAlunos, criarAluno, editarAluno, excluirAluno, nomeAlunoExiste, adicionarAlunoNaTurma, getTurmas, removerAlunoDeTurmas } from '../../services/authService';
 
 const interFont = fontFamily?.inter?.regular || fontFamily?.poppins?.regular || 'System';
 const larguraSidebar = 220;
@@ -167,12 +167,10 @@ export default function Alunos() {
       const turmasDoBanco = await getTurmas();
       setTurmas(turmasDoBanco);
 
-      // Garante que turmaSelecionada seja sempre string (igual ao value do Picker)
       let turmaId = null;
       if (aluno.turma && typeof aluno.turma === 'object' && aluno.turma.id) {
         turmaId = String(aluno.turma.id);
       } else if (aluno.turma && typeof aluno.turma === 'string') {
-        // Caso turma seja string (nome), tenta encontrar o id pela lista de turmas
         const turmaObj = turmasDoBanco.find(t => t.nome === aluno.turma);
         turmaId = turmaObj ? String(turmaObj.id) : null;
       }
@@ -201,6 +199,26 @@ export default function Alunos() {
       setModalDesignarVisible(false);
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const removerDaTurma = async () => {
+    try {
+      if (!alunoSelecionado) return;
+
+      await removerAlunoDeTurmas(alunoSelecionado.id);
+
+      setAlunos(prev =>
+        prev.map(a =>
+          a.id === alunoSelecionado.id
+            ? { ...a, turma: null }
+            : a
+        )
+      );
+
+      setModalDesignarVisible(false);
+    } catch (err) {
+      console.error("Erro ao remover aluno da turma:", err);
     }
   };
 
@@ -651,6 +669,13 @@ export default function Alunos() {
                     onPress={() => setModalDesignarVisible(false)}
                   >
                     <Text style={{ color: '#374151', fontWeight: 'bold' }}>Fechar</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={{ backgroundColor: '#EF4444', padding: 10, borderRadius: 8, minWidth: 80, alignItems: 'center' }}
+                    onPress={removerDaTurma}
+                  >
+                    <Text style={{ color: '#fff', fontWeight: 'bold' }}>Remover</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity

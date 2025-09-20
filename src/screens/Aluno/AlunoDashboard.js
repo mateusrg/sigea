@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, FlatList, Modal, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, FlatList, Modal, useWindowDimensions, ActivityIndicator } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LocaleConfig } from 'react-native-calendars';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
@@ -11,7 +11,10 @@ import { useNavigation } from '@react-navigation/native';
 const interFont = fontFamily?.inter?.regular || fontFamily?.poppins?.regular || 'System';
 const larguraSidebar = 220;
 
+import { getAlunos } from '../../services/authService';
+
 export default function AlunoDashboard() {
+  const [loading, setLoading] = useState(true);
   const [userName, setUserName] = useState('');
   const hoje = (() => {
     const now = new Date();
@@ -25,19 +28,29 @@ export default function AlunoDashboard() {
   const { width } = useWindowDimensions();
   const navigation = useNavigation();
 
+  const [turma, setTurma] = useState('Carregando...');
+
   useEffect(() => {
-    const fetchUser = async () => {
+    const fetchUserAndTurma = async () => {
       try {
         const userData = await AsyncStorage.getItem('user');
         if (userData) {
           const userObj = JSON.parse(userData);
           setUserName(userObj.nome || 'Aluno');
+
+          const alunos = await getAlunos();
+          const alunoInfo = alunos.find(a => a.nome === userObj.nome);
+          setTurma(alunoInfo?.turma || 'Sem turma');
         }
-      } catch {
+      } catch (err) {
+        console.log(err);
         setUserName('Aluno');
+        setTurma('Sem turma');
+      } finally {
+        setLoading(false);
       }
     };
-    fetchUser();
+    fetchUserAndTurma();
   }, []);
 
   const handleLogout = async () => {
@@ -55,8 +68,6 @@ export default function AlunoDashboard() {
     { label: "Minhas Notas", value: "Consulte seu desempenho", icon: ChartBarIcon, iconColor: "#009466", backColor: "#d0fae4", function: () => navigation.navigate('NotasAlunoScreen') },
     { label: "Calendário", value: "Próximas aulas e eventos", icon: CalendarIcon, iconColor: "#d97501", backColor: "#fbf4c9", function: () => navigation.navigate('CalendarioAlunoScreen') },
   ];
-
-  const turma = "Matemática 101";
 
   let numColumns = 1;
   if (width >= 1200) numColumns = 3;
@@ -118,7 +129,7 @@ export default function AlunoDashboard() {
                 contentContainerStyle={styles.cardsRow}
                 renderItem={({ item }) => (
                   <TouchableOpacity key={item.label} style={styles.card} onPress={item.function}>
-                    <item.icon size={32} color={item.iconColor} weight="bold" style={{ backgroundColor: item.backColor, padding: 8, borderRadius: "50%", marginBottom: 8 }} />
+                    <item.icon size={32} color={item.iconColor} weight="bold" style={{ backgroundColor: item.backColor, padding: 8, borderRadius: 50, marginBottom: 8 }} />
                     <Text style={styles.cardLabel}>{item.label}</Text>
                     <Text style={styles.cardValue}>{item.value}</Text>
                   </TouchableOpacity>

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, FlatList, Modal, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, FlatList, Modal, useWindowDimensions, ActivityIndicator } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Calendar, LocaleConfig } from 'react-native-calendars';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
@@ -11,41 +11,75 @@ import { useNavigation } from '@react-navigation/native';
 const interFont = fontFamily?.inter?.regular || fontFamily?.poppins?.regular || 'System';
 const larguraSidebar = 220;
 
-const upcomingClasses = [
-  { notas: 'Nota 1', valor: '9,3', status: 'Enviada' },
-  { notas: 'Nota 2', valor: '7,5', status: 'Enviada' },
-  { notas: 'Nota 3', valor: '-', status: 'Aguardando' },
-  { notas: 'Média Final', valor: '-', status: 'Aguardando' },
-];
+import { getNotasAluno, getAlunoIdPorNome } from '../../services/authService';
 
 export default function NotasAluno() {
   const [userName, setUserName] = useState('');
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const { width } = useWindowDimensions();
   const navigation = useNavigation();
+  const [loading, setLoading] = useState(true);
 
-  const [notasData, setNotasData] = useState(upcomingClasses);
+  const [notasData, setNotasData] = useState([]);
 
   useEffect(() => {
-    // filtra só as notas numéricas (exclui Média Final e Aguardando)
-    const notasNumericas = notasData
-      .filter(item => item.notas !== 'Média Final' && item.valor !== '-' && item.valor.trim() !== '')
-      .map(item => parseFloat(item.valor.replace(',', '.')));
+    const fetchNotas = async () => {
+      try {
+        setLoading(true);
+        const userData = await AsyncStorage.getItem('user');
+        if (!userData) return;
 
-    // verifica se todas as 3 notas estão preenchidas
-    if (notasNumericas.length === 3) {
-      const media = (notasNumericas.reduce((acc, n) => acc + n, 0) / 3).toFixed(1).replace('.', ',');
+        const userObj = JSON.parse(userData);
+        setUserName(userObj.nome || 'Aluno');
 
-      // atualiza o item "Média Final"
-      setNotasData(prev =>
-        prev.map(item =>
-          item.notas === 'Média Final'
-            ? { ...item, valor: media, status: 'Enviada' }
-            : item
-        )
-      );
-    }
-  }, [notasData]);
+        const idAluno = await getAlunoIdPorNome(userObj.nome);
+        if (!idAluno) {
+          setNotasData([]);
+          return;
+        }
+
+        const notasDoBanco = await getNotasAluno(idAluno);
+        if (!notasDoBanco || notasDoBanco.length === 0) {
+          setNotasData([]);
+          return;
+        }
+
+        const notasFormatadas = notasDoBanco.map(n => {
+          const hasValor = n.valor !== null && n.valor !== undefined && String(n.valor).trim() !== '';
+          const rawValor = hasValor ? parseFloat(String(n.valor).replace(',', '.')) : null;
+          return {
+            notas: `Nota ${n.nota}`,
+            valor: hasValor ? String(n.valor).replace('.', ',') : '-',
+            status: hasValor ? 'Enviada' : 'Aguardando',
+            rawValor
+          };
+        });
+
+        const todasTemValor = notasFormatadas.length > 0 && notasFormatadas.every(n => n.rawValor !== null);
+        let media = '-';
+        let mediaStatus = 'Aguardando';
+        if (todasTemValor) {
+          const soma = notasFormatadas.reduce((acc, n) => acc + n.rawValor, 0);
+          media = (soma / notasFormatadas.length).toFixed(1).replace('.', ',');
+          mediaStatus = 'Enviada';
+        }
+
+        const listaFinal = [
+          ...notasFormatadas,
+          { notas: 'Média Final', valor: media, status: mediaStatus }
+        ];
+
+        setNotasData(listaFinal);
+      } catch (err) {
+        console.error('Erro ao buscar notas:', err);
+        setNotasData([{ notas: 'Erro ao carregar notas', valor: '-', status: 'Aguardando' }]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchNotas();
+  }, []);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -146,6 +180,17 @@ export default function NotasAluno() {
                   showsVerticalScrollIndicator={false}
                   scrollEnabled={false}
                 />
+                {loading && (
+                  <View style={{ marginTop: 16, alignItems: 'center', paddingVertical: 20 }}>
+                    <ActivityIndicator size="large" color={colors.blue || '#000'} />
+                    <Text style={{ marginTop: 8, color: colors.blue || '#000', fontFamily: interFont, fontWeight: '500' }}>Carregando notas...</Text>
+                  </View>
+                )}
+                {notasData.length === 0 && !loading && (
+                  <View style={{ marginTop: 16, alignItems: 'center', paddingVertical: 20 }}>
+                    <Text style={{ color: colors.darkGray || '#000', fontFamily: interFont, fontWeight: 'semibold' }}>Nenhum dado de notas disponível.</Text>
+                  </View>
+                )}
               </View>
             </ScrollView>
           </View>

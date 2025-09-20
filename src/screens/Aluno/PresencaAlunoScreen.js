@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, FlatList, Modal, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, FlatList, Modal, useWindowDimensions, ActivityIndicator } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Calendar, LocaleConfig } from 'react-native-calendars';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
@@ -11,36 +11,64 @@ import { useNavigation } from '@react-navigation/native';
 const interFont = fontFamily?.inter?.regular || fontFamily?.poppins?.regular || 'System';
 const larguraSidebar = 220;
 
-const dataPresenca = [
-    { data: '12/05/2024', status: 'Presente' },
-    { data: '10/05/2024', status: 'Falta' },
-    { data: '08/05/2024', status: 'Falta Justificada', obs: 'Atestado médico' },
-    { data: '05/05/2024', status: 'Presente' },
-    { data: '03/05/2024', status: 'Presente' },
-    { data: '01/05/2024', status: 'Presente' },
-];
-
-const turma = "Matemática 101";
+import { getPresencasAluno, getAlunoIdPorNome, getAlunos } from '../../services/authService';
 
 export default function PresencaAluno() {
+    const [loading, setLoading] = useState(true);
+    const [loadingPresenca, setLoadingPresenca] = useState(true);
     const [userName, setUserName] = useState('');
     const [logoutModalVisible, setLogoutModalVisible] = useState(false);
     const { width } = useWindowDimensions();
     const navigation = useNavigation();
 
+    const [dataPresenca, setDataPresenca] = useState([]);
+    const [turma, setTurma] = useState('');
+
     useEffect(() => {
-        const fetchUser = async () => {
+        const fetchUserAndTurma = async () => {
             try {
                 const userData = await AsyncStorage.getItem('user');
                 if (userData) {
                     const userObj = JSON.parse(userData);
                     setUserName(userObj.nome || 'Aluno');
+
+                    const alunos = await getAlunos();
+                    const alunoInfo = alunos.find(a => a.nome === userObj.nome);
+                    setTurma(alunoInfo?.turma || 'Sem turma');
                 }
-            } catch {
+            } catch (err) {
+                console.log(err);
                 setUserName('Aluno');
+                setTurma('Sem turma');
+            } finally {
+                setLoading(false);
             }
         };
-        fetchUser();
+        fetchUserAndTurma();
+    }, []);
+
+    useEffect(() => {
+        const fetchPresencas = async () => {
+            setLoadingPresenca(true);
+            try {
+                const userData = await AsyncStorage.getItem('user');
+                const alunoId = await getAlunoIdPorNome(JSON.parse(userData).nome);
+                if (!alunoId) {
+                    console.warn("Aluno não encontrado!");
+                    setDataPresenca([]);
+                } else {
+                    const presencas = await getPresencasAluno(alunoId);
+                    setDataPresenca(presencas);
+                }
+            } catch (err) {
+                console.log(err);
+                setDataPresenca([]);
+            } finally {
+                setLoadingPresenca(false);
+            }
+        };
+
+        fetchPresencas();
     }, []);
 
     const handleLogout = async () => {
@@ -161,6 +189,17 @@ export default function PresencaAluno() {
                                         <Text style={[styles.tableCell, { flex: 0.8 }]}>{item.obs || '-'}</Text>
                                     </View>
                                 ))}
+                                {loadingPresenca && (
+                                    <View style={{ marginTop: 16, alignItems: 'center', paddingVertical: 20 }}>
+                                        <ActivityIndicator size="large" color={colors.blue || '#000'} />
+                                        <Text style={{ marginTop: 8, color: colors.blue || '#000', fontFamily: interFont, fontWeight: '500' }}>Carregando presenças...</Text>
+                                    </View>
+                                )}
+                                {dataPresenca.length === 0 && !loadingPresenca && (
+                                    <View style={{ marginTop: 16, alignItems: 'center', paddingVertical: 20 }}>
+                                        <Text style={{ color: colors.darkGray || '#000', fontFamily: interFont, fontWeight: 'semibold' }}>Nenhum dado de presença disponível.</Text>
+                                    </View>
+                                )}
                             </View>
                         </ScrollView>
                     </View>

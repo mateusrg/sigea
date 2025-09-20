@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, FlatList, Modal, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, FlatList, Modal, useWindowDimensions, ActivityIndicator } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Calendar, LocaleConfig } from 'react-native-calendars';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
@@ -10,6 +10,8 @@ import { useNavigation } from '@react-navigation/native';
 
 const interFont = fontFamily?.inter?.regular || fontFamily?.poppins?.regular || 'System';
 const larguraSidebar = 220;
+
+import { getAlunos } from '../../services/authService';
 
 // Configurações de idioma do calendário
 LocaleConfig.locales['pt-br'] = {
@@ -24,19 +26,8 @@ LocaleConfig.locales['pt-br'] = {
 };
 LocaleConfig.defaultLocale = 'pt-br';
 
-// Exemplo de datas com presença/falta
-const fixedMarkedDates = {
-    "2025-09-01": { marked: true, dotColor: "green" },
-    "2025-09-02": { marked: true, dotColor: "red" },
-    "2025-09-05": { marked: true, dotColor: "green" },
-};
-const diasDeAulaFixos = {
-    "2025-09-03": { marked: true, dotColor: colors.blue, selectedColor: colors.blue, curso: "Matemática 101", horario: "10:00 - 11:30" },
-    "2025-09-05": { marked: true, dotColor: colors.blue, selectedColor: colors.blue, curso: "Matemática 101", horario: "10:00 - 11:30" },
-    "2025-09-10": { marked: true, dotColor: colors.blue, selectedColor: colors.blue, curso: "Matemática 101", horario: "10:00 - 11:30" },
-};
-
 export default function CalendarioAluno() {
+    const [loading, setLoading] = useState(true);
     const [userName, setUserName] = useState('');
     const hoje = (() => {
         const now = new Date();
@@ -49,6 +40,9 @@ export default function CalendarioAluno() {
     const [logoutModalVisible, setLogoutModalVisible] = useState(false);
     const { width } = useWindowDimensions();
     const navigation = useNavigation();
+
+    const [diasDeAula, setDiasDeAula] = useState({});
+    const [turmaAluno, setTurmaAluno] = useState('');
 
     useEffect(() => {
         const fetchUser = async () => {
@@ -65,6 +59,63 @@ export default function CalendarioAluno() {
         fetchUser();
     }, []);
 
+    useEffect(() => {
+        const fetchTurmaEGerarAulas = async () => {
+            setLoading(true);
+            try {
+                const userData = await AsyncStorage.getItem('user');
+                if (!userData) return;
+
+                const userObj = JSON.parse(userData);
+                const alunos = await getAlunos();
+                const alunoInfo = alunos.find(a => a.nome === userObj.nome);
+
+                if (!alunoInfo) return;
+
+                setUserName(userObj.nome || 'Aluno');
+                const turma = alunoInfo.turma;
+                const turno = alunoInfo.turno || 'manhã';
+
+                setTurmaAluno(turma);
+
+                let horario;
+                if (turno === 'manhã') horario = '08:00 - 12:00';
+                else if (turno === 'tarde') horario = '13:00 - 17:00';
+                else horario = '18:00 - 22:00';
+
+                const hoje = new Date();
+                const ano = hoje.getFullYear();
+                const mes = hoje.getMonth();
+
+                const dias = {};
+                const primeiroDia = new Date(ano, mes, 1);
+                const ultimoDia = new Date(ano, mes + 1, 0);
+
+                for (let dia = primeiroDia; dia <= ultimoDia; dia.setDate(dia.getDate() + 1)) {
+                    const diaSemana = dia.getDay();
+                    if (diaSemana >= 1 && diaSemana <= 5) {
+                        const diaStr = `${dia.getFullYear()}-${String(dia.getMonth() + 1).padStart(2, '0')}-${String(dia.getDate()).padStart(2, '0')}`;
+                        dias[diaStr] = {
+                            marked: true,
+                            dotColor: colors.blue,
+                            selectedColor: colors.blue,
+                            curso: turma,
+                            horario: horario
+                        };
+                    }
+                }
+
+                setDiasDeAula(dias);
+            } catch (err) {
+                console.log(err);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchTurmaEGerarAulas();
+    }, []);
+
     const handleLogout = async () => {
         setLogoutModalVisible(false);
         await AsyncStorage.removeItem('user');
@@ -76,11 +127,11 @@ export default function CalendarioAluno() {
     };
 
     const markedDates = {
-        ...diasDeAulaFixos,
+        ...diasDeAula,
         [selectedDate]: {
-            ...diasDeAulaFixos[selectedDate],
+            ...diasDeAula[selectedDate],
             selected: true,
-            selectedColor: diasDeAulaFixos[selectedDate]?.dotColor || colors.blue,
+            selectedColor: diasDeAula[selectedDate]?.dotColor || colors.blue,
             dotColor: colors.white,
         },
     };
@@ -99,7 +150,7 @@ export default function CalendarioAluno() {
     };
 
     const getStatus = (date) => {
-        const aula = diasDeAulaFixos[date];
+        const aula = diasDeAula[date];
 
         if (aula) {
             return {
@@ -164,38 +215,59 @@ export default function CalendarioAluno() {
                                 <Text style={styles.pageTitle}>Calendário</Text>
                             </View>
 
-                            <View style={{ flex: 1, flexDirection: 'column', gap: 1 }}>
-                                <View style={{ flex: 1, marginBottom: 16 }}>
-                                    {/* Calendário */}
-                                    <Calendar
-                                        current={hoje}
-                                        style={styles.calendario}
-                                        onDayPress={(day) => setSelectedDate(day.dateString)}
-                                        markedDates={markedDates}
-                                        theme={{
-                                            selectedDayTextColor: colors.white,
-                                            todayTextColor: colors.darkGray,
-                                            arrowColor: colors.darkGray,
-                                            textDayFontFamily: fontFamily.roboto.medium,
-                                            textMonthFontFamily: fontFamily.roboto.bold,
-                                            textDayHeaderFontFamily: fontFamily.roboto.regular,
-                                            textDayFontSize: 16,
-                                            textMonthFontSize: 18,
-                                            textDayHeaderFontSize: 14,
-                                        }}
-                                        showSixWeeks={true}
-                                    />
+                            {loading ? (
+                                <View style={{ marginTop: 16, alignItems: 'center', paddingVertical: 20 }}>
+                                    <ActivityIndicator size="large" color={colors.blue || '#000'} />
+                                    <Text style={{ marginTop: 8, color: colors.blue || '#000', fontFamily: interFont, fontWeight: '500' }}>Carregando aulas...</Text>
                                 </View>
-
-                                <View style={styles.statusBox}>
-                                    <View style={{ flex: 0.4, backgroundColor: "#2563ea", padding: 20, borderRadius: 6, justifyContent: 'center', alignItems: 'flex-start' }}>
-                                        <Text style={styles.statusDate}>{formatarData(selectedDate)}</Text>
+                            ) : (turmaAluno !== null ? (
+                                <View style={{ flex: 1, flexDirection: 'column', gap: 1 }}>
+                                    <View style={{ flex: 1, marginBottom: 16 }}>
+                                        {/* Calendário */}
+                                        <Calendar
+                                            current={hoje}
+                                            style={styles.calendario}
+                                            onDayPress={(day) => setSelectedDate(day.dateString)}
+                                            markedDates={markedDates}
+                                            theme={{
+                                                selectedDayTextColor: colors.white,
+                                                todayTextColor: colors.darkGray,
+                                                arrowColor: colors.darkGray,
+                                                textDayFontFamily: fontFamily.roboto.medium,
+                                                textMonthFontFamily: fontFamily.roboto.bold,
+                                                textDayHeaderFontFamily: fontFamily.roboto.regular,
+                                                textDayFontSize: 16,
+                                                textMonthFontSize: 18,
+                                                textDayHeaderFontSize: 14,
+                                            }}
+                                            showSixWeeks={true}
+                                        />
                                     </View>
-                                    <Text style={[styles.statusTexto, { color: getStatus(selectedDate).color }]}>
-                                        {getStatus(selectedDate).text}
+
+                                    <View style={styles.statusBox}>
+                                        <View style={{ flex: 0.4, backgroundColor: "#2563ea", padding: 20, borderRadius: 6, justifyContent: 'center', alignItems: 'flex-start' }}>
+                                            <Text style={styles.statusDate}>{formatarData(selectedDate)}</Text>
+                                        </View>
+                                        <Text style={[styles.statusTexto, { color: getStatus(selectedDate).color }]}>
+                                            {getStatus(selectedDate).text}
+                                        </Text>
+                                    </View>
+                                </View>
+                            ) : (
+                                <View style={{
+                                    marginTop: 16, alignItems: 'center', paddingVertical: 20, borderRadius: 8,
+                                    backgroundColor: colors.white,
+                                    elevation: 2,
+                                    borderWidth: 1,
+                                    borderColor: colors.lightGray,
+                                    alignItems: 'center',
+                                }}>
+                                    <Text style={{ color: colors.darkGray || '#000', fontFamily: interFont, fontWeight: 'semibold' }}>
+                                        Nenhum dado de aulas disponível.
                                     </Text>
                                 </View>
-                            </View>
+                            )
+                            )}
                         </ScrollView>
                     </View>
                     {/* Logout Modal */}

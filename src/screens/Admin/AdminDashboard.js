@@ -41,7 +41,7 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     const fetchDashboardData = async () => {
-      setLoading(true); // inicia loading
+      setLoading(true);
       try {
         const counts = await getDashboardCounts();
         const turmaMaisAlunos = await getTurmaComMaisAlunos();
@@ -58,7 +58,7 @@ export default function AdminDashboard() {
       } catch (error) {
         console.error("Erro ao buscar dados do dashboard:", error);
       } finally {
-        setLoading(false); // termina loading
+        setLoading(false);
       }
     };
 
