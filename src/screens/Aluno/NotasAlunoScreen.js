@@ -126,8 +126,8 @@ export default function NotasAluno() {
                 <Text style={styles.upcomingTitle}>{userName}</Text>
                 <View style={styles.tableHeader}>
                   <Text style={[styles.tableHeaderCell, { flex: 1 }]}>Notas</Text>
-                  <Text style={[styles.tableHeaderCell, { flex: 0.5, textAlign: 'center', marginLeft: 20 }]}>Valor</Text>
-                  <Text style={[styles.tableHeaderCell, { flex: 2, textAlign: 'center', marginLeft: 20 }]}>Status</Text>
+                  <Text style={[styles.tableHeaderCell, { flex: 0.5, textAlign: 'center' }]}>Valor</Text>
+                  <Text style={[styles.tableHeaderCell, { flex: 2, textAlign: 'center' }]}>Status</Text>
                 </View>
                 <FlatList
                   data={notasData}

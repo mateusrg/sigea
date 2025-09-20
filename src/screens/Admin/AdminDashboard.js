@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, FlatList } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, FlatList, ActivityIndicator } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { fontFamily } from '../../styles/fontFamily';
@@ -12,11 +12,17 @@ import { useWindowDimensions } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Modal } from 'react-native';
 
+import { getDashboardCounts, getTurmaComMaisAlunos, getAlunosAtivosHoje } from '../../services/authService';
+
 export default function AdminDashboard() {
   const [userName, setUserName] = useState('');
   const { width } = useWindowDimensions();
   const navigation = useNavigation();
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
+
+  const [dashboardCards, setDashboardCards] = useState([]);
+  const [turma, setTurma] = useState({ nome: '', alunos: 0 });
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -33,13 +39,31 @@ export default function AdminDashboard() {
     fetchUser();
   }, []);
 
-  const dashboardCards = [
-    { label: "Total de Turmas", value: "12" },
-    { label: "Total de Professores", value: "8" },
-    { label: "Total de Alunos", value: "120" },
-    { label: "Alunos Ativos Hoje", value: "102" },
-    { label: "Turma com mais alunos", value: "Turma 101 (25)" },
-  ];
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      setLoading(true); // inicia loading
+      try {
+        const counts = await getDashboardCounts();
+        const turmaMaisAlunos = await getTurmaComMaisAlunos();
+        const ativosHoje = await getAlunosAtivosHoje();
+
+        setDashboardCards([
+          { label: "Total de Turmas", value: counts.totalTurmas },
+          { label: "Total de Professores", value: counts.totalProfessores },
+          { label: "Total de Alunos", value: counts.totalAlunos },
+          { label: "Alunos Ativos Hoje", value: ativosHoje },
+        ]);
+
+        setTurma(turmaMaisAlunos);
+      } catch (error) {
+        console.error("Erro ao buscar dados do dashboard:", error);
+      } finally {
+        setLoading(false); // termina loading
+      }
+    };
+
+    fetchDashboardData();
+  }, []);
 
   const handleLogout = async () => {
     setLogoutModalVisible(false);
@@ -98,19 +122,31 @@ export default function AdminDashboard() {
             </View>
 
             <ScrollView style={styles.scrollArea} contentContainerStyle={{ paddingBottom: 24 }}>
-              <FlatList
-                data={dashboardCards}
-                keyExtractor={(_, idx) => idx.toString()}
-                numColumns={numColumns}
-                key={numColumns}
-                contentContainerStyle={styles.cardsRow}
-                renderItem={({ item }) => (
-                  <DashboardCard label={item.label} value={item.value} />
-                )}
-                columnWrapperStyle={numColumns > 1 ? { gap: 16 } : undefined}
-                showsVerticalScrollIndicator={false}
-                scrollEnabled={false}
-              />
+              {loading ? (
+                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 50 }}>
+                  <ActivityIndicator size="large" color="#2563ea" />
+                  <Text style={{ marginTop: 12, color: '#374151', fontSize: 16 }}>Carregando dados...</Text>
+                </View>
+              ) : (
+                <>
+                  <FlatList
+                    data={dashboardCards}
+                    keyExtractor={(_, idx) => idx.toString()}
+                    numColumns={numColumns}
+                    key={numColumns}
+                    contentContainerStyle={styles.cardsRow}
+                    renderItem={({ item }) => <DashboardCard label={item.label} value={item.value} />}
+                    columnWrapperStyle={numColumns > 1 ? { gap: 16 } : undefined}
+                    showsVerticalScrollIndicator={false}
+                    scrollEnabled={false}
+                  />
+
+                  <TouchableOpacity style={[styles.card, { backgroundColor: "#2563ea", alignItems: 'flex-start', justifyContent: 'center', padding: 40, gap: 4, cursor: "default", marginTop: -24 }]} activeOpacity={1}>
+                    <Text style={{ fontSize: 14, color: colors.white, fontWeight: "thin", opacity: 0.8 }}>Turma com mais alunos:</Text>
+                    <Text style={{ fontSize: 40, fontWeight: "bold", color: colors.white }}>{turma.nome} ({turma.alunos} alunos)</Text>
+                  </TouchableOpacity>
+                </>
+              )}
             </ScrollView>
           </View>
           {/* Logout Modal */}
