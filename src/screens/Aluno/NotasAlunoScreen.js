@@ -1,25 +1,85 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, Modal, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, FlatList, Modal, useWindowDimensions, ActivityIndicator } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Calendar, LocaleConfig } from 'react-native-calendars';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { fontFamily } from '../../styles/fontFamily';
 import { colors } from '../../styles/colors';
-import { HouseIcon, NoteIcon, SignOutIcon } from 'phosphor-react-native';
-import { useWindowDimensions } from 'react-native';
+import { HouseIcon, ChalkboardTeacherIcon, NoteIcon, SignOutIcon, UserCircleIcon, ClockCounterClockwiseIcon, ChartBarIcon, CalendarIcon, CalendarBlankIcon } from 'phosphor-react-native';
 import { useNavigation } from '@react-navigation/native';
-import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
-const larguraSidebar = 220;
 const interFont = fontFamily?.inter?.regular || fontFamily?.poppins?.regular || 'System';
+const larguraSidebar = 220;
 
-// Funções utilitárias
-const formatGrade = (grade) => grade.toFixed(1).replace('.', ',');
-const calculateAverage = (grades) => grades.length ? grades.reduce((a, b) => a + b, 0) / grades.length : 0;
+import { getNotasAluno, getAlunoIdPorNome } from '../../services/authService';
 
 export default function NotasAluno() {
   const [userName, setUserName] = useState('');
-  const userGrades = [8.5, 9.0];
-  const navigation = useNavigation();
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
+  const { width } = useWindowDimensions();
+  const navigation = useNavigation();
+  const [loading, setLoading] = useState(true);
+
+  const [notasData, setNotasData] = useState([]);
+
+  useEffect(() => {
+    const fetchNotas = async () => {
+      try {
+        setLoading(true);
+        const userData = await AsyncStorage.getItem('user');
+        if (!userData) return;
+
+        const userObj = JSON.parse(userData);
+        setUserName(userObj.nome || 'Aluno');
+
+        const idAluno = await getAlunoIdPorNome(userObj.nome);
+        if (!idAluno) {
+          setNotasData([]);
+          return;
+        }
+
+        const notasDoBanco = await getNotasAluno(idAluno);
+        if (!notasDoBanco || notasDoBanco.length === 0) {
+          setNotasData([]);
+          return;
+        }
+
+        const notasFormatadas = notasDoBanco.map(n => {
+          const hasValor = n.valor !== null && n.valor !== undefined && String(n.valor).trim() !== '';
+          const rawValor = hasValor ? parseFloat(String(n.valor).replace(',', '.')) : null;
+          return {
+            notas: `Nota ${n.nota}`,
+            valor: hasValor ? String(n.valor).replace('.', ',') : '-',
+            status: hasValor ? 'Enviada' : 'Aguardando',
+            rawValor
+          };
+        });
+
+        const todasTemValor = notasFormatadas.length > 0 && notasFormatadas.every(n => n.rawValor !== null);
+        let media = '-';
+        let mediaStatus = 'Aguardando';
+        if (todasTemValor) {
+          const soma = notasFormatadas.reduce((acc, n) => acc + n.rawValor, 0);
+          media = (soma / notasFormatadas.length).toFixed(1).replace('.', ',');
+          mediaStatus = 'Enviada';
+        }
+
+        const listaFinal = [
+          ...notasFormatadas,
+          { notas: 'Média Final', valor: media, status: mediaStatus }
+        ];
+
+        setNotasData(listaFinal);
+      } catch (err) {
+        console.error('Erro ao buscar notas:', err);
+        setNotasData([{ notas: 'Erro ao carregar notas', valor: '-', status: 'Aguardando' }]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchNotas();
+  }, []);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -29,9 +89,8 @@ export default function NotasAluno() {
           const userObj = JSON.parse(userData);
           setUserName(userObj.nome || 'Aluno');
         }
-      } catch (error) {
+      } catch {
         setUserName('Aluno');
-        setUserGrades([]);
       }
     };
     fetchUser();
@@ -46,6 +105,10 @@ export default function NotasAluno() {
       routes: [{ name: 'Login' }],
     });
   };
+
+  let numColumns = 1;
+  if (width >= 1200) numColumns = 3;
+  else if (width >= 750) numColumns = 2;
 
   return (
     <SafeAreaProvider>
@@ -63,63 +126,74 @@ export default function NotasAluno() {
                 <Text style={styles.logoText}>Eduteca</Text>
               </View>
               <View style={styles.sidebarNav}>
-                <SidebarButton
-                  label="Dashboard"
-                  icon={<HouseIcon size={22} weight="regular" color="#374151" />}
-                  onPress={() => navigation.navigate('AlunoDashboard')}
-                />
-                <SidebarButton
-                  label="Notas"
-                  active
-                  icon={<NoteIcon size={22} weight="regular" color="#374151" />}
-                  onPress={() => navigation.navigate('NotasAlunoScreen')}
-                />
+                <SidebarButton label="Dashboard" icon={<HouseIcon size={22} weight="regular" color="#374151" />} onPress={() => navigation.navigate('AlunoDashboard')} />
+                <SidebarButton label="Presenças" icon={<ClockCounterClockwiseIcon size={22} weight="regular" color="#374151" />} onPress={() => navigation.navigate('PresencaAlunoScreen')} />
+                <SidebarButton label="Notas" active icon={<NoteIcon size={22} weight="regular" color="#374151" />} onPress={() => navigation.navigate('NotasAlunoScreen')} />
+                <SidebarButton label="Calendário" icon={<CalendarBlankIcon size={22} weight="regular" color="#374151" />} onPress={() => navigation.navigate('CalendarioAlunoScreen')} />
               </View>
             </View>
             <View style={styles.sidebarBottom}>
-              <SidebarButton
-                label="Sair"
-                icon={<SignOutIcon size={22} weight="regular" color="#374151" />}
-                onPress={() => setLogoutModalVisible(true)}
-              />
+              <SidebarButton label="Sair" icon={<SignOutIcon size={22} weight="regular" color="#374151" />} onPress={() => setLogoutModalVisible(true)} />
             </View>
           </View>
 
           {/* Main Content */}
           <View style={styles.main}>
-            <ScrollView style={styles.scrollArea} contentContainerStyle={{ paddingBottom: 24 }}>
+            <View style={styles.header}>
+              <View style={styles.headerRight}>
+                <View style={styles.profileRow}>
+                  <UserCircleIcon size={32} color={colors.darkGray} weight="regular" style={styles.profileImg} />
+                  <View>
+                    <Text style={styles.profileName}>{userName}</Text>
+                    <Text style={styles.profileRole}>Aluno</Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+
+            <ScrollView style={styles.scrollArea}>
               <View style={styles.headerContainer}>
                 <Text style={styles.pageTitle}>Notas</Text>
               </View>
 
-              <View style={styles.tableContainer}>
-                <View style={styles.tableWrapper}>
-                  <View style={styles.tableHeader}>
-                    <Text style={[styles.tableHeaderCell, styles.studentNameColumn]}>Estudante</Text>
-                    <Text style={[styles.tableHeaderCell, styles.gradeColumn]}>Nota 1</Text>
-                    <Text style={[styles.tableHeaderCell, styles.gradeColumn]}>Nota 2</Text>
-                    <Text style={[styles.tableHeaderCell, styles.gradeColumn]}>Média Final</Text>
-                  </View>
-
-                  <View style={[styles.tableRow, styles.tableRowBorder]}>
-                    <Text style={[styles.tableCell, styles.tableCellBold, styles.studentNameColumn]}>
-                      {userName}
-                    </Text>
-                    <Text style={[styles.tableCell, styles.tableCellSecondary, styles.gradeColumn]}>
-                      {formatGrade(userGrades[0])}
-                    </Text>
-                    <Text style={[styles.tableCell, styles.tableCellSecondary, styles.gradeColumn]}>
-                      {formatGrade(userGrades[1])}
-                    </Text>
-                    <Text style={[styles.tableCell, styles.tableCellSecondary, styles.gradeColumn]}>
-                      {formatGrade(calculateAverage(userGrades))}
-                    </Text>
-                  </View>
+              <View style={styles.upcomingContainer}>
+                <Text style={styles.upcomingTitle}>{userName}</Text>
+                <View style={styles.tableHeader}>
+                  <Text style={[styles.tableHeaderCell, { flex: 1 }]}>Notas</Text>
+                  <Text style={[styles.tableHeaderCell, { flex: 0.5, textAlign: 'center' }]}>Valor</Text>
+                  <Text style={[styles.tableHeaderCell, { flex: 2, textAlign: 'center' }]}>Status</Text>
                 </View>
+                <FlatList
+                  data={notasData}
+                  keyExtractor={(item) => item.notas}
+                  renderItem={({ item }) => (
+                    <View style={styles.tableRow}>
+                      <Text style={styles.tableCellBold} numberOfLines={1} ellipsizeMode="tail">{item.notas}</Text>
+                      <Text style={styles.tableCell}>{item.valor}</Text>
+                      <View style={{ alignItems: 'center', flex: 2 }}>
+                        <View style={[styles.statusBadge, { alignSelf: 'center', minWidth: undefined, backgroundColor: item.status === 'Aguardando' ? '#fef9c3' : '#dbeafe' }]}>
+                          <Text style={[styles.statusBadgeText, { color: item.status === 'Aguardando' ? '#ca8a04' : '#1e40af' }]}>{item.status}</Text>
+                        </View>
+                      </View>
+                    </View>
+                  )}
+                  showsVerticalScrollIndicator={false}
+                  scrollEnabled={false}
+                />
+                {loading && (
+                  <View style={{ marginTop: 16, alignItems: 'center', paddingVertical: 20 }}>
+                    <ActivityIndicator size="large" color={colors.blue || '#000'} />
+                    <Text style={{ marginTop: 8, color: colors.blue || '#000', fontFamily: interFont, fontWeight: '500' }}>Carregando notas...</Text>
+                  </View>
+                )}
+                {notasData.length === 0 && !loading && (
+                  <View style={{ marginTop: 16, alignItems: 'center', paddingVertical: 20 }}>
+                    <Text style={{ color: colors.darkGray || '#000', fontFamily: interFont, fontWeight: 'semibold' }}>Nenhum dado de notas disponível.</Text>
+                  </View>
+                )}
               </View>
             </ScrollView>
           </View>
-
           {/* Logout Modal */}
           <Modal
             visible={logoutModalVisible}
@@ -127,22 +201,33 @@ export default function NotasAluno() {
             animationType="fade"
             onRequestClose={() => setLogoutModalVisible(false)}
           >
-            <View style={styles.modalOverlay}>
-              <View style={styles.modalContent}>
-                <Text style={styles.modalTitle}>Confirmar Logout</Text>
-                <Text style={styles.modalMessage}>Tem certeza que deseja sair?</Text>
-                <View style={styles.modalActions}>
+            <View style={{
+              flex: 1,
+              backgroundColor: 'rgba(0,0,0,0.3)',
+              justifyContent: 'center',
+              alignItems: 'center'
+            }}>
+              <View style={{
+                backgroundColor: '#fff',
+                borderRadius: 12,
+                padding: 24,
+                alignItems: 'center',
+                width: 320
+              }}>
+                <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 12 }}>Confirmar Logout</Text>
+                <Text style={{ fontSize: 15, color: '#374151', marginBottom: 24 }}>Tem certeza que deseja sair?</Text>
+                <View style={{ flexDirection: 'row', gap: 16 }}>
                   <TouchableOpacity
-                    style={styles.modalCancelButton}
+                    style={{ backgroundColor: '#e5e7eb', padding: 10, borderRadius: 8, minWidth: 80, alignItems: 'center' }}
                     onPress={() => setLogoutModalVisible(false)}
                   >
-                    <Text style={styles.modalCancelText}>Cancelar</Text>
+                    <Text style={{ color: '#374151', fontWeight: 'bold' }}>Cancelar</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={styles.modalConfirmButton}
+                    style={{ backgroundColor: '#ef4444', padding: 10, borderRadius: 8, minWidth: 80, alignItems: 'center' }}
                     onPress={handleLogout}
                   >
-                    <Text style={styles.modalConfirmText}>Sair</Text>
+                    <Text style={{ color: '#fff', fontWeight: 'bold' }}>Sair</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -166,7 +251,7 @@ function SidebarButton({ label, icon, active, onPress }) {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#f9fafb',
   },
   container: {
     flex: 1,
@@ -193,6 +278,11 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     paddingHorizontal: 8,
     paddingVertical: 8,
+  },
+  logoIcon: {
+    width: 72,
+    height: 72,
+    marginRight: 8,
   },
   logoText: {
     fontFamily: fontFamily.poppins.medium,
@@ -242,17 +332,83 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingLeft: larguraSidebar,
     flexDirection: 'column',
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#fff',
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+    backgroundColor: '#fff',
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+  },
+  headerTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#1f2937',
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  notificationBtn: {
+    position: 'relative',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+  },
+  notificationIcon: {
+    fontSize: 22,
+    color: '#374151',
+  },
+  notificationDot: {
+    position: 'absolute',
+    top: 6,
+    right: 8,
+    width: 8,
+    height: 8,
+    backgroundColor: '#ef4444',
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
+  profileRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 0,
+  },
+  profileImg: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 8,
+  },
+  profileName: {
+    fontWeight: 'bold',
+    color: '#1f2937',
+    fontSize: 15,
+  },
+  profileRole: {
+    color: '#6b7280',
+    fontSize: 13,
   },
   scrollArea: {
     flex: 1,
+    padding: 24,
+    backgroundColor: '#f9fafb',
+    maxHeight: 622
   },
   headerContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
+    marginBottom: 16
   },
   pageTitle: {
     color: '#0d171b',
@@ -261,214 +417,125 @@ const styles = StyleSheet.create({
     letterSpacing: -0.5,
     minWidth: 288,
   },
-  selectorContainer: {
-    maxWidth: 480,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'flex-end',
-    gap: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+  cardsRow: {
+    marginBottom: 8,
+    paddingBottom: 0,
+    paddingHorizontal: 0,
   },
-  pickerWrapper: {
+  card: {
     flex: 1,
-    minWidth: 160,
-  },
-  picker: {
-    height: 56,
-    width: '100%',
-    backgroundColor: '#f8fafc',
-    borderWidth: 1,
-    borderColor: '#cfdfe7',
+    minWidth: 150,
+    backgroundColor: '#fff',
     borderRadius: 12,
-    paddingHorizontal: 15,
-    color: '#0d171b',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    padding: 18,
+    marginBottom: 8,
+    gap: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 2,
+  },
+  cardLabel: {
+    color: '#1f2937',
+    fontSize: 22,
+    fontWeight: 'bold',
+    marginBottom: 2,
+  },
+  cardValue: {
+    color: '#6b7280',
     fontSize: 16,
-    fontWeight: 'normal',
+    fontWeight: '500',
   },
-  actionsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  addColumnButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 40,
-    backgroundColor: '#10b981',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-  },
-  addColumnButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: 'bold',
-    letterSpacing: 0.15,
-  },
-  rightActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  leftActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  iconButton: {
-    padding: 8,
-    color: '#0d171b',
-  },
-  exportButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    maxWidth: 480,
-    height: 40,
-    backgroundColor: '#13a4ec',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    gap: 8,
-    minWidth: 0,
-  },
-  exportButtonText: {
-    color: '#f8fafc',
-    fontSize: 14,
-    fontWeight: 'bold',
-    letterSpacing: 0.15,
-  },
-  tableContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  tableWrapper: {
-    overflow: 'hidden',
-    borderRadius: 12,
+  upcomingContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#cfdfe7',
-    backgroundColor: '#f8fafc',
+    borderColor: '#e5e7eb',
+    marginTop: 8,
+    marginBottom: 8,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  upcomingTitle: {
+    fontFamily: interFont,
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1f2937',
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    paddingBottom: 24,
+    letterSpacing: 0.2,
   },
   tableHeader: {
     flexDirection: 'row',
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#f3f4f6',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    alignItems: 'center',
   },
   tableHeaderCell: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    color: '#0d171b',
-    fontSize: 14,
-    fontWeight: '500',
+    flex: 1,
+    fontFamily: interFont,
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#6b7280',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
     textAlign: 'left',
-  },
-  studentNameColumn: {
-    width: 400,
-  },
-  gradeColumn: {
-    width: 400,
+    paddingRight: 8,
   },
   tableRow: {
     flexDirection: 'row',
-  },
-  tableRowBorder: {
-    borderTopWidth: 1,
-    borderTopColor: '#cfdfe7',
-  },
-  tableCell: {
-    fontFamily: interFont,
-    height: 72,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    fontSize: 14,
-    fontWeight: 'normal',
-    textAlign: 'left',
-    textAlignVertical: 'center',
-    display: 'flex',
     alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+    backgroundColor: '#fff',
+    minHeight: 48,
   },
   tableCellBold: {
-    color: '#0d171b',
-    fontWeight: 'normal',
-    fontFamily: fontFamily.inter.medium,
-  },
-  tableCellSecondary: {
-    color: '#4c809a',
-  },
-  gradeInput: {
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#cfdfe7',
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    textAlign: 'center',
-    minHeight: 32,
-  },
-  saveButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    minWidth: 84,
-    maxWidth: 480,
-    height: 40,
-    backgroundColor: '#13a4ec',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-  },
-  saveButtonText: {
-    color: '#f8fafc',
-    fontSize: 14,
-    fontWeight: 'bold',
-    letterSpacing: 0.15,
-  },
-  modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 24,
-    alignItems: 'center',
-    width: 320,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 12,
-  },
-  modalMessage: {
+    fontFamily: fontFamily.inter.medium,
     fontSize: 15,
-    color: '#374151',
-    marginBottom: 24,
+    color: '#1f2937',
+    letterSpacing: 0.1,
+    textAlign: 'left',
+    paddingRight: 8,
   },
-  modalActions: {
-    flexDirection: 'row',
-    gap: 16,
+  tableCell: {
+    flex: 0.5,
+    fontFamily: interFont,
+    fontSize: 15,
+    color: '#6b7280',
+    fontWeight: '500',
+    letterSpacing: 0.1,
+    textAlign: 'center',
+    paddingRight: 8,
   },
-  modalCancelButton: {
-    backgroundColor: '#e5e7eb',
-    padding: 10,
-    borderRadius: 8,
-    minWidth: 80,
+  statusBadge: {
+    backgroundColor: '#dbeafe',
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    alignSelf: 'center',
     alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 0,
+    minWidth: undefined,
   },
-  modalCancelText: {
-    color: '#374151',
-    fontWeight: 'bold',
-  },
-  modalConfirmButton: {
-    backgroundColor: '#ef4444',
-    padding: 10,
-    borderRadius: 8,
-    minWidth: 80,
-    alignItems: 'center',
-  },
-  modalConfirmText: {
-    color: '#fff',
-    fontWeight: 'bold',
+  statusBadgeText: {
+    fontFamily: interFont,
+    color: '#1e40af',
+    fontSize: 13,
+    fontWeight: '600',
+    letterSpacing: 0.2,
+    textAlign: 'center',
   },
 });
