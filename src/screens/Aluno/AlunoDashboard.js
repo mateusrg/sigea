@@ -31,7 +31,7 @@ const fixedMarkedDates = {
   "2025-09-05": { marked: true, dotColor: "green" },
 };
 
-export default function AlunoDashboard() {
+export default function AlunoDashboard({ setUserProfile }) {
   const [userName, setUserName] = useState('');
   const hoje = (() => {
     const now = new Date();

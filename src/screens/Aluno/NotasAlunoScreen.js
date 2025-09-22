@@ -15,7 +15,7 @@ const interFont = fontFamily?.inter?.regular || fontFamily?.poppins?.regular || 
 const formatGrade = (grade) => grade.toFixed(1).replace('.', ',');
 const calculateAverage = (grades) => grades.length ? grades.reduce((a, b) => a + b, 0) / grades.length : 0;
 
-export default function NotasAluno() {
+export default function NotasAluno({ setUserProfile }) {
   const [userName, setUserName] = useState('');
   const userGrades = [8.5, 9.0];
   const navigation = useNavigation();
@@ -39,12 +39,21 @@ export default function NotasAluno() {
 
   const handleLogout = async () => {
     setLogoutModalVisible(false);
-    await AsyncStorage.removeItem('user');
-    await AsyncStorage.removeItem('token');
-    navigation.reset({
-      index: 0,
-      routes: [{ name: 'Login' }],
-    });
+    try {
+      await AsyncStorage.removeItem('user');
+      await AsyncStorage.removeItem('token');
+      // Reset the user profile in the parent component
+      if (typeof setUserProfile === 'function') {
+        setUserProfile(null);
+      }
+      // Don't try to navigate - let App.js handle the screen transition
+    } catch (error) {
+      console.error('Error during logout:', error);
+      // Still try to reset user profile even if AsyncStorage fails
+      if (typeof setUserProfile === 'function') {
+        setUserProfile(null);
+      }
+    }
   };
 
   return (

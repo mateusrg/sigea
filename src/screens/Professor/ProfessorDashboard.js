@@ -1,16 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, FlatList } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, FlatList, ActivityIndicator } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { fontFamily } from '../../styles/fontFamily';
 const interFont = fontFamily?.inter?.regular || fontFamily?.poppins?.regular || 'System';
 import { colors } from '../../styles/colors';
-import { HouseIcon, ChalkboardTeacherIcon, ClipboardTextIcon, NoteIcon, GearIcon, SignOutIcon, BellIcon, UserIcon, UserCircleIcon, CheckCircleIcon } from 'phosphor-react-native';
-
-const upcomingClasses = [
-  { class: 'Ciências 201', time: '10:30', status: 'Agendado' },
-  { class: 'História 301', time: '13:00', status: 'Agendado' },
-  { class: 'Inglês 101', time: '14:30', status: 'Agendado' },
-];
+import { HouseIcon, ChalkboardTeacherIcon, ClipboardTextIcon, NoteIcon, GearIcon, SignOutIcon, BellIcon, UserIcon, UserCircleIcon, CheckCircleIcon, XCircleIcon } from 'phosphor-react-native';
+import { db } from '../../services/firebase';
 
 const larguraSidebar = 220;
 
@@ -18,8 +13,17 @@ import { useWindowDimensions } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Modal } from 'react-native';
 
-export default function ProfessorDashboard() {
+export default function ProfessorDashboard({ setUserProfile }) {
   const [userName, setUserName] = useState('');
+  const [currentUser, setCurrentUser] = useState(null);
+  const [dashboardData, setDashboardData] = useState({
+    totalTurmas: 0,
+    totalEstudantes: 0,
+    proximaAula: 'Carregando...',
+    chamadaStatus: { completed: 0, total: 0 }
+  });
+  const [upcomingClasses, setUpcomingClasses] = useState([]);
+  const [loading, setLoading] = useState(true);
   const { width } = useWindowDimensions();
   const navigation = useNavigation();
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
@@ -28,21 +32,6 @@ export default function ProfessorDashboard() {
   if (width >= 1600) numColumns = 4;
   else if (width >= 750) numColumns = 2;
 
-  const dashboardCards = [
-    { label: "Total de Aulas", value: "712" },
-    { label: "Total de Estudantes", value: "120" },
-    { label: "Próxima Aula", value: "Matemática 101 - 9:00" },
-    {
-      label: "Chamada do Dia",
-      value: (
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <Text style={{ color: '#16a34a', fontWeight: 'bold', fontSize: 24 }}>Feita</Text>
-          <CheckCircleIcon size={22} color="#16a34a" weight="regular" style={{ marginLeft: 6 }} />
-        </View>
-      ),
-    },
-  ];
-
   useEffect(() => {
     const fetchUser = async () => {
       try {
@@ -50,13 +39,175 @@ export default function ProfessorDashboard() {
         if (userData) {
           const userObj = JSON.parse(userData);
           setUserName(userObj.nome || '');
+          setCurrentUser(userObj);
         }
       } catch (error) {
         setUserName('');
+        setCurrentUser(null);
       }
     };
     fetchUser();
   }, []);
+
+  useEffect(() => {
+    if (currentUser) {
+      loadDashboardData();
+    }
+  }, [currentUser]);
+
+  const findUserByName = async () => {
+    try {
+      const userQuery = await db.collection('users')
+        .where('nome', '==', currentUser.nome)
+        .where('papel', '==', currentUser.papel)
+        .get();
+      
+      if (!userQuery.empty) {
+        const userDoc = userQuery.docs[0];
+        const userId = userDoc.id;
+        setCurrentUser(prev => ({ ...prev, uid: userId }));
+        return userId;
+      } else {
+        return null;
+      }
+    } catch (error) {
+      console.error('Erro ao buscar usuário pelo nome (ProfessorDashboard):', error);
+      return null;
+    }
+  };
+
+  const getTurnoPrioridade = (turno) => {
+    const prioridades = { 'Manhã': 1, 'Tarde': 2, 'Noite': 3 };
+    return prioridades[turno] || 999;
+  };
+
+  const loadDashboardData = async () => {
+    try {
+      setLoading(true);
+      
+      let userId = currentUser?.uid || currentUser?.id;
+      if (!userId) {
+        userId = await findUserByName();
+        if (!userId) {
+          setLoading(false);
+          return;
+        }
+      }      
+      const allTurmasSnapshot = await db.collection('turmas').get();
+      const turmasProf = [];
+      let totalEstudantes = 0;
+      for (const turmaDoc of allTurmasSnapshot.docs) {
+        const professoresSnapshot = await db
+          .collection('turmas')
+          .doc(turmaDoc.id)
+          .collection('professores')
+          .where('idProfessor', '==', userId)
+          .get();
+
+        if (!professoresSnapshot.empty) {
+          const turmaData = { id: turmaDoc.id, ...turmaDoc.data() };
+          turmasProf.push(turmaData);
+          const alunosSnapshot = await db
+            .collection('turmas')
+            .doc(turmaDoc.id)
+            .collection('alunos')
+            .get();
+          const alunosCount = alunosSnapshot.docs.length;
+          totalEstudantes += alunosCount;
+        }
+      }
+
+      const today = new Date().toISOString().split('T')[0];
+      let chamadasFeitas = 0;
+      const totalTurmas = turmasProf.length;
+      const turmasSemChamada = [];
+
+      for (const turma of turmasProf) {
+        try {
+          const chamadaDoc = await db
+            .collection('turmas')
+            .doc(turma.id)
+            .collection('chamadas')
+            .doc(today)
+            .get();
+          
+          if (chamadaDoc.exists) {
+            chamadasFeitas++;
+          } else {
+            turmasSemChamada.push(turma);
+          }
+        } catch (error) {
+          console.error(`Erro ao verificar chamada para turma ${turma.nome}:`, error);
+          turmasSemChamada.push(turma);
+        }
+      }
+
+      let proximaAula = 'Nenhuma pendente';
+      if (turmasSemChamada.length > 0) {
+        const proximaTurma = turmasSemChamada.sort((a, b) => 
+          getTurnoPrioridade(a.turno) - getTurnoPrioridade(b.turno)
+        )[0];
+        proximaAula = `${proximaTurma.nome} - ${proximaTurma.turno}`;
+      }
+      const upcomingClassesData = turmasSemChamada
+        .sort((a, b) => getTurnoPrioridade(a.turno) - getTurnoPrioridade(b.turno))
+        .slice(0, 5)
+        .map((turma) => ({
+          class: turma.nome,
+          time: turma.turno,
+          status: 'Pendente'
+        }));
+
+      const finalData = {
+        totalTurmas: totalTurmas,
+        totalEstudantes: totalEstudantes,
+        proximaAula: proximaAula,
+        chamadaStatus: { completed: chamadasFeitas, total: totalTurmas }
+      };
+
+      setDashboardData(finalData);
+      setUpcomingClasses(upcomingClassesData);
+      
+    } catch (error) {
+      console.error('Erro ao carregar dashboard:', error);
+      setDashboardData({
+        totalTurmas: 0,
+        totalEstudantes: 0,
+        proximaAula: 'Erro ao carregar',
+        chamadaStatus: { completed: 0, total: 0 }
+      });
+      setUpcomingClasses([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const dashboardCards = [
+    { label: "Total de Turmas", value: dashboardData.totalTurmas.toString() },
+    { label: "Total de Estudantes", value: dashboardData.totalEstudantes.toString() },
+    { label: "Próxima Aula", value: dashboardData.proximaAula },
+    {
+      label: "Chamada do Dia",
+      value: (
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <Text style={{ 
+            color: dashboardData.chamadaStatus.completed === dashboardData.chamadaStatus.total && dashboardData.chamadaStatus.total > 0 
+              ? '#16a34a' 
+              : '#f59e0b', 
+            fontWeight: 'bold', 
+            fontSize: 24 
+          }}>
+            {dashboardData.chamadaStatus.completed}/{dashboardData.chamadaStatus.total}
+          </Text>
+          {dashboardData.chamadaStatus.completed === dashboardData.chamadaStatus.total && dashboardData.chamadaStatus.total > 0 ? (
+            <CheckCircleIcon size={22} color="#16a34a" weight="regular" style={{ marginLeft: 6 }} />
+          ) : (
+            <XCircleIcon size={22} color="#f59e0b" weight="regular" style={{ marginLeft: 6 }} />
+          )}
+        </View>
+      ),
+    },
+  ];
 
   return (
     <View style={styles.root}>
@@ -73,7 +224,7 @@ export default function ProfessorDashboard() {
             </View>
             <View style={styles.sidebarNav}>
               <SidebarButton label="Dashboard" active icon={<HouseIcon size={22} weight="regular" color="#374151" />} onPress={() => navigation.navigate('ProfessorDashboard')} />
-              <SidebarButton label="Aulas" icon={<ChalkboardTeacherIcon size={22} weight="regular" color="#374151" />} onPress={() => navigation.navigate('TurmasScreen')} />
+              <SidebarButton label="Turmas" icon={<ChalkboardTeacherIcon size={22} weight="regular" color="#374151" />} onPress={() => navigation.navigate('TurmasScreen')} />
               <SidebarButton label="Chamada" icon={<ClipboardTextIcon size={22} weight="regular" color="#374151" />} onPress={() => navigation.navigate('PresencaScreen')} />
               <SidebarButton label="Notas" icon={<NoteIcon size={22} weight="regular" color="#374151" />} onPress={() => navigation.navigate('NotasScreen')} />
             </View>
@@ -95,45 +246,72 @@ export default function ProfessorDashboard() {
               </View>
             </View>
           </View>
-          <ScrollView style={styles.scrollArea} contentContainerStyle={{ paddingBottom: 24 }}>
-            <FlatList
-              data={dashboardCards}
-              keyExtractor={(_, idx) => idx.toString()}
-              numColumns={numColumns}
-              key={numColumns}
-              contentContainerStyle={styles.cardsRow}
-              renderItem={({ item }) => (
-                <DashboardCard label={item.label} value={item.value} />
-              )}
-              columnWrapperStyle={numColumns > 1 ? { gap: 16 } : undefined}
-              showsVerticalScrollIndicator={false}
-              scrollEnabled={false}
-            />
-            <View style={styles.upcomingContainer}>
-              <Text style={styles.upcomingTitle}>Próximas Aulas</Text>
-              <View style={styles.tableHeader}>
-                <Text style={styles.tableHeaderCell}>Aula</Text>
-                <Text style={styles.tableHeaderCell}>Horário</Text>
-                <Text style={styles.tableHeaderCell}>Status</Text>
+          <ScrollView style={styles.scrollArea}>
+            {loading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#2563eb" />
+                <Text style={styles.loadingText}>Carregando dashboard...</Text>
               </View>
-              <FlatList
-                data={upcomingClasses}
-                keyExtractor={(item) => item.class}
-                renderItem={({ item }) => (
-                  <View style={styles.tableRow}>
-                    <Text style={styles.tableCellBold} numberOfLines={1} ellipsizeMode="tail">{item.class}</Text>
-                    <Text style={styles.tableCell}>{item.time}</Text>
-                    <View style={{ alignItems: 'flex-start', flex: 1, marginLeft: -24 }}>
-                      <View style={[styles.statusBadge, { alignSelf: 'flex-start', minWidth: undefined }]}>
-                        <Text style={styles.statusBadgeText}>{item.status}</Text>
-                      </View>
+            ) : (
+              <>
+                <FlatList
+                  data={dashboardCards}
+                  keyExtractor={(_, idx) => idx.toString()}
+                  numColumns={numColumns}
+                  key={numColumns}
+                  contentContainerStyle={styles.cardsRow}
+                  renderItem={({ item }) => (
+                    <DashboardCard label={item.label} value={item.value} />
+                  )}
+                  columnWrapperStyle={numColumns > 1 ? { gap: 16 } : undefined}
+                  showsVerticalScrollIndicator={false}
+                  scrollEnabled={false}
+                />
+                <View style={styles.upcomingContainer}>
+                  <Text style={styles.upcomingTitle}>Próximas Aulas</Text>
+                  {upcomingClasses.length === 0 ? (
+                    <View style={styles.emptyUpcoming}>
+                      <Text style={styles.emptyUpcomingText}>
+                        {dashboardData.chamadaStatus.completed === dashboardData.chamadaStatus.total && dashboardData.chamadaStatus.total > 0
+                          ? 'Todas as chamadas do dia foram realizadas!'
+                          : 'Nenhuma turma pendente'
+                        }
+                      </Text>
                     </View>
-                  </View>
-                )}
-                showsVerticalScrollIndicator={false}
-                scrollEnabled={false}
-              />
-            </View>
+                  ) : (
+                    <>
+                      <View style={styles.tableHeader}>
+                        <Text style={styles.tableHeaderCell}>Turma</Text>
+                        <Text style={styles.tableHeaderCell}>  Turno</Text>
+                        <Text style={styles.tableHeaderCell}>Status</Text>
+                      </View>
+                      <FlatList
+                        data={upcomingClasses}
+                        keyExtractor={(item, index) => `${item.class}-${index}`}
+                        renderItem={({ item }) => (
+                          <View style={styles.tableRow}>
+                            <Text style={styles.tableCellBold} numberOfLines={1} ellipsizeMode="tail">{item.class}</Text>
+                            <Text style={styles.tableCell}>{item.time}</Text>
+                            <View style={{ alignItems: 'flex-start', flex: 1, marginLeft: -24 }}>
+                              <View style={[styles.statusBadge, 
+                                item.status === 'Pendente' ? styles.statusBadgePending : styles.statusBadgeScheduled, 
+                                { alignSelf: 'flex-start', minWidth: undefined }
+                              ]}>
+                                <Text style={[styles.statusBadgeText, 
+                                  item.status === 'Pendente' ? styles.statusBadgeTextPending : styles.statusBadgeTextScheduled
+                                ]}>{item.status}</Text>
+                              </View>
+                            </View>
+                          </View>
+                        )}
+                        showsVerticalScrollIndicator={false}
+                        scrollEnabled={false}
+                      />
+                    </>
+                  )}
+                </View>
+              </>
+            )}
           </ScrollView>
         </View>
         <Modal
@@ -166,15 +344,20 @@ export default function ProfessorDashboard() {
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={{ backgroundColor: '#ef4444', padding: 10, borderRadius: 8, minWidth: 80, alignItems: 'center' }}
-                  onPress={() => {
+                  onPress={async () => {
                     setLogoutModalVisible(false);
-                    AsyncStorage.removeItem('user');
-                    AsyncStorage.removeItem('token');
-                    if (typeof setUserProfile === 'function') setUserProfile(null);
-                    navigation.reset({
-                      index: 0,
-                      routes: [{ name: 'Login' }],
-                    });
+                    try {
+                      await AsyncStorage.removeItem('user');
+                      await AsyncStorage.removeItem('token');
+                      if (typeof setUserProfile === 'function') {
+                        setUserProfile(null);
+                      }
+                    } catch (error) {
+                      console.error('Erro durante logout:', error);
+                      if (typeof setUserProfile === 'function') {
+                        setUserProfile(null);
+                      }
+                    }
                   }}
                 >
                   <Text style={{ color: '#fff', fontWeight: 'bold' }}>Sair</Text>
@@ -218,14 +401,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     flexDirection: 'row',
-    minHeight: '100%',
   },
   sidebar: {
     position: 'absolute',
     left: 0,
     top: 0,
+    bottom: 0,
     zIndex: 10,
-    height: '100vh',
     width: larguraSidebar,
     backgroundColor: '#fff',
     borderRightWidth: 1,
@@ -292,7 +474,7 @@ const styles = StyleSheet.create({
   },
   main: {
     flex: 1,
-    paddingLeft: larguraSidebar,
+    marginLeft: larguraSidebar,
     flexDirection: 'column',
     backgroundColor: '#fff',
   },
@@ -361,7 +543,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   scrollArea: {
-    flex: 1,
+    height: 'calc(100vh - 80px)',
     padding: 24,
     backgroundColor: '#f9fafb',
   },
@@ -476,12 +658,47 @@ const styles = StyleSheet.create({
     marginLeft: 0,
     minWidth: undefined,
   },
+  statusBadgeScheduled: {
+    backgroundColor: '#dbeafe',
+  },
+  statusBadgePending: {
+    backgroundColor: '#fef3c7',
+  },
   statusBadgeText: {
     fontFamily: interFont,
     color: '#1e40af',
     fontSize: 13,
     fontWeight: '600',
     letterSpacing: 0.2,
+    textAlign: 'center',
+  },
+  statusBadgeTextScheduled: {
+    color: '#1e40af',
+  },
+  statusBadgeTextPending: {
+    color: '#d97706',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 64,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#6b7280',
+    fontFamily: fontFamily.inter.regular || 'System',
+  },
+  emptyUpcoming: {
+    padding: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyUpcomingText: {
+    fontSize: 16,
+    color: '#6b7280',
+    fontFamily: fontFamily.inter.regular || 'System',
     textAlign: 'center',
   },
 });
