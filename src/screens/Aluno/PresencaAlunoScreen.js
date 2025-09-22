@@ -13,7 +13,7 @@ const larguraSidebar = 220;
 
 import { getPresencasAluno, getAlunoIdPorNome, getAlunos } from '../../services/authService';
 
-export default function PresencaAluno() {
+export default function PresencaAluno({ setUserProfile }) {
     const [loading, setLoading] = useState(true);
     const [loadingPresenca, setLoadingPresenca] = useState(true);
     const [userName, setUserName] = useState('');
@@ -37,7 +37,6 @@ export default function PresencaAluno() {
                     setTurma(alunoInfo?.turma || 'Sem turma');
                 }
             } catch (err) {
-                console.log(err);
                 setUserName('Aluno');
                 setTurma('Sem turma');
             } finally {
@@ -61,7 +60,6 @@ export default function PresencaAluno() {
                     setDataPresenca(presencas);
                 }
             } catch (err) {
-                console.log(err);
                 setDataPresenca([]);
             } finally {
                 setLoadingPresenca(false);
@@ -73,12 +71,18 @@ export default function PresencaAluno() {
 
     const handleLogout = async () => {
         setLogoutModalVisible(false);
-        await AsyncStorage.removeItem('user');
-        await AsyncStorage.removeItem('token');
-        navigation.reset({
-            index: 0,
-            routes: [{ name: 'Login' }],
-        });
+        try {
+            await AsyncStorage.removeItem('user');
+            await AsyncStorage.removeItem('token');
+            if (typeof setUserProfile === 'function') {
+                setUserProfile(null);
+            }
+        } catch (error) {
+            console.error('Error during logout:', error);
+            if (typeof setUserProfile === 'function') {
+                setUserProfile(null);
+            }
+        }
     };
 
     let numColumns = 1;

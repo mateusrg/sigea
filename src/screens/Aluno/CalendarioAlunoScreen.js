@@ -13,7 +13,6 @@ const larguraSidebar = 220;
 
 import { getAlunos } from '../../services/authService';
 
-// Configurações de idioma do calendário
 LocaleConfig.locales['pt-br'] = {
     monthNames: [
         'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
@@ -26,7 +25,7 @@ LocaleConfig.locales['pt-br'] = {
 };
 LocaleConfig.defaultLocale = 'pt-br';
 
-export default function CalendarioAluno() {
+export default function CalendarioAluno({ setUserProfile }) {
     const [loading, setLoading] = useState(true);
     const [userName, setUserName] = useState('');
     const hoje = (() => {
@@ -106,9 +105,7 @@ export default function CalendarioAluno() {
                 }
 
                 setDiasDeAula(dias);
-            } catch (err) {
-                console.log(err);
-            } finally {
+            } catch (err) {} finally {
                 setLoading(false);
             }
         };
@@ -118,12 +115,18 @@ export default function CalendarioAluno() {
 
     const handleLogout = async () => {
         setLogoutModalVisible(false);
-        await AsyncStorage.removeItem('user');
-        await AsyncStorage.removeItem('token');
-        navigation.reset({
-            index: 0,
-            routes: [{ name: 'Login' }],
-        });
+        try {
+            await AsyncStorage.removeItem('user');
+            await AsyncStorage.removeItem('token');
+            if (typeof setUserProfile === 'function') {
+                setUserProfile(null);
+            }
+        } catch (error) {
+            console.error('Error during logout:', error);
+            if (typeof setUserProfile === 'function') {
+                setUserProfile(null);
+            }
+        }
     };
 
     const markedDates = {
@@ -196,7 +199,7 @@ export default function CalendarioAluno() {
                         </View>
                     </View>
 
-                    {/* Main Content */}
+                    {/* Conteúdo Principal */}
                     <View style={styles.main}>
                         <View style={styles.header}>
                             <View style={styles.headerRight}>

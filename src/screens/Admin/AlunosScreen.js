@@ -17,7 +17,7 @@ import { useWindowDimensions } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Modal } from 'react-native';
 
-export default function Alunos() {
+export default function Alunos({ setUserProfile }) {
   const [userName, setUserName] = useState('');
   const { width } = useWindowDimensions();
   const navigation = useNavigation();
@@ -110,12 +110,18 @@ export default function Alunos() {
 
   const handleLogout = async () => {
     setLogoutModalVisible(false);
-    await AsyncStorage.removeItem('user');
-    await AsyncStorage.removeItem('token');
-    navigation.reset({
-      index: 0,
-      routes: [{ name: 'Login' }],
-    });
+    try {
+      await AsyncStorage.removeItem('user');
+      await AsyncStorage.removeItem('token');
+      if (typeof setUserProfile === 'function') {
+        setUserProfile(null);
+      }
+    } catch (error) {
+      console.error('Error during logout:', error);
+      if (typeof setUserProfile === 'function') {
+        setUserProfile(null);
+      }
+    }
   };
 
   const handleSalvarAluno = async () => {
@@ -253,7 +259,7 @@ export default function Alunos() {
             </View>
           </View>
 
-          {/* Main Content */}
+          {/* Conteúdo Principal */}
           <View style={styles.main}>
             <View style={styles.header}>
               <View style={styles.headerRight}>

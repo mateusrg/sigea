@@ -13,7 +13,7 @@ const larguraSidebar = 220;
 
 import { getAlunos } from '../../services/authService';
 
-export default function AlunoDashboard() {
+export default function AlunoDashboard({ setUserProfile }) {
   const [loading, setLoading] = useState(true);
   const [userName, setUserName] = useState('');
   const hoje = (() => {
@@ -43,7 +43,6 @@ export default function AlunoDashboard() {
           setTurma(alunoInfo?.turma || 'Sem turma');
         }
       } catch (err) {
-        console.log(err);
         setUserName('Aluno');
         setTurma('Sem turma');
       } finally {
@@ -55,12 +54,18 @@ export default function AlunoDashboard() {
 
   const handleLogout = async () => {
     setLogoutModalVisible(false);
-    await AsyncStorage.removeItem('user');
-    await AsyncStorage.removeItem('token');
-    navigation.reset({
-      index: 0,
-      routes: [{ name: 'Login' }],
-    });
+    try {
+      await AsyncStorage.removeItem('user');
+      await AsyncStorage.removeItem('token');
+      if (typeof setUserProfile === 'function') {
+        setUserProfile(null);
+      }
+    } catch (error) {
+      console.error('Error during logout:', error);
+      if (typeof setUserProfile === 'function') {
+        setUserProfile(null);
+      }
+    }
   };
 
   const dashboardCards = [
@@ -100,7 +105,7 @@ export default function AlunoDashboard() {
             </View>
           </View>
 
-          {/* Main Content */}
+          {/* Conteúdo Principal */}
           <View style={styles.main}>
             <View style={styles.header}>
               <Text style={styles.headerTitle}>Bem-vindo(a), {userName.split(' ')[0]}!</Text>

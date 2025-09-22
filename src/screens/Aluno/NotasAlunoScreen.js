@@ -101,14 +101,11 @@ export default function NotasAluno({ setUserProfile }) {
     try {
       await AsyncStorage.removeItem('user');
       await AsyncStorage.removeItem('token');
-      // Reset the user profile in the parent component
       if (typeof setUserProfile === 'function') {
         setUserProfile(null);
       }
-      // Don't try to navigate - let App.js handle the screen transition
     } catch (error) {
       console.error('Error during logout:', error);
-      // Still try to reset user profile even if AsyncStorage fails
       if (typeof setUserProfile === 'function') {
         setUserProfile(null);
       }
@@ -146,7 +143,7 @@ export default function NotasAluno({ setUserProfile }) {
             </View>
           </View>
 
-          {/* Main Content */}
+          {/* Conteúdo Principal */}
           <View style={styles.main}>
             <View style={styles.header}>
               <View style={styles.headerRight}>

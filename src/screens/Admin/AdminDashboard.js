@@ -14,7 +14,7 @@ import { Modal } from 'react-native';
 
 import { getDashboardCounts, getTurmaComMaisAlunos, getAlunosAtivosHoje } from '../../services/authService';
 
-export default function AdminDashboard() {
+export default function AdminDashboard({ setUserProfile }) {
   const [userName, setUserName] = useState('');
   const { width } = useWindowDimensions();
   const navigation = useNavigation();
@@ -67,12 +67,18 @@ export default function AdminDashboard() {
 
   const handleLogout = async () => {
     setLogoutModalVisible(false);
-    await AsyncStorage.removeItem('user');
-    await AsyncStorage.removeItem('token');
-    navigation.reset({
-      index: 0,
-      routes: [{ name: 'Login' }],
-    });
+    try {
+      await AsyncStorage.removeItem('user');
+      await AsyncStorage.removeItem('token');
+      if (typeof setUserProfile === 'function') {
+        setUserProfile(null);
+      }
+    } catch (error) {
+      console.error('Erro durante logout:', error);
+      if (typeof setUserProfile === 'function') {
+        setUserProfile(null);
+      }
+    }
   };
 
   let numColumns = 1;
@@ -83,7 +89,6 @@ export default function AdminDashboard() {
     <SafeAreaProvider>
       <SafeAreaView style={styles.root}>
         <View style={styles.container}>
-          {/* Sidebar */}
           <View style={styles.sidebar}>
             <View>
               <View style={styles.logoRow}>
@@ -105,8 +110,6 @@ export default function AdminDashboard() {
               <SidebarButton label="Sair" icon={<SignOutIcon size={22} weight="regular" color="#374151" />} onPress={() => setLogoutModalVisible(true)} />
             </View>
           </View>
-
-          {/* Main Content */}
           <View style={styles.main}>
             <View style={styles.header}>
               <Text style={styles.headerTitle}>Bem-vindo(a), {userName.split(' ')[0]}!</Text>
@@ -149,7 +152,6 @@ export default function AdminDashboard() {
               )}
             </ScrollView>
           </View>
-          {/* Logout Modal */}
           <Modal
             visible={logoutModalVisible}
             transparent
