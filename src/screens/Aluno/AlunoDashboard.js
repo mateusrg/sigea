@@ -1,37 +1,20 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, FlatList, Modal, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, FlatList, Modal, useWindowDimensions, ActivityIndicator } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Calendar, LocaleConfig } from 'react-native-calendars';
+import { LocaleConfig } from 'react-native-calendars';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { fontFamily } from '../../styles/fontFamily';
 import { colors } from '../../styles/colors';
-import { HouseIcon, ChalkboardTeacherIcon, NoteIcon, SignOutIcon, UserCircleIcon } from 'phosphor-react-native';
+import { HouseIcon, ChalkboardTeacherIcon, NoteIcon, SignOutIcon, UserCircleIcon, ClockCounterClockwiseIcon, ChartBarIcon, CalendarIcon, CalendarBlankIcon } from 'phosphor-react-native';
 import { useNavigation } from '@react-navigation/native';
 
 const interFont = fontFamily?.inter?.regular || fontFamily?.poppins?.regular || 'System';
 const larguraSidebar = 220;
 
-// Configurações de idioma do calendário
-LocaleConfig.locales['pt-br'] = {
-  monthNames: [
-    'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
-  ],
-  monthNamesShort: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'],
-  dayNames: ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'],
-  dayNamesShort: ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'],
-  today: 'Hoje'
-};
-LocaleConfig.defaultLocale = 'pt-br';
+import { getAlunos } from '../../services/authService';
 
-// Exemplo de datas com presença/falta
-const fixedMarkedDates = {
-  "2025-09-01": { marked: true, dotColor: "green" },
-  "2025-09-02": { marked: true, dotColor: "red" },
-  "2025-09-05": { marked: true, dotColor: "green" },
-};
-
-export default function AlunoDashboard({ setUserProfile }) {
+export default function AlunoDashboard() {
+  const [loading, setLoading] = useState(true);
   const [userName, setUserName] = useState('');
   const hoje = (() => {
     const now = new Date();
@@ -45,19 +28,29 @@ export default function AlunoDashboard({ setUserProfile }) {
   const { width } = useWindowDimensions();
   const navigation = useNavigation();
 
+  const [turma, setTurma] = useState('Carregando...');
+
   useEffect(() => {
-    const fetchUser = async () => {
+    const fetchUserAndTurma = async () => {
       try {
         const userData = await AsyncStorage.getItem('user');
         if (userData) {
           const userObj = JSON.parse(userData);
           setUserName(userObj.nome || 'Aluno');
+
+          const alunos = await getAlunos();
+          const alunoInfo = alunos.find(a => a.nome === userObj.nome);
+          setTurma(alunoInfo?.turma || 'Sem turma');
         }
-      } catch {
+      } catch (err) {
+        console.log(err);
         setUserName('Aluno');
+        setTurma('Sem turma');
+      } finally {
+        setLoading(false);
       }
     };
-    fetchUser();
+    fetchUserAndTurma();
   }, []);
 
   const handleLogout = async () => {
@@ -70,61 +63,14 @@ export default function AlunoDashboard({ setUserProfile }) {
     });
   };
 
-  const markedDates = {
-    ...fixedMarkedDates,
-    [selectedDate]: {
-      ...fixedMarkedDates[selectedDate],
-      selected: true,
-      selectedColor: fixedMarkedDates[selectedDate]?.dotColor || colors.blue,
-      dotColor: colors.white,
-    },
-  };
-
-  const diasSemana = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
-  const meses = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
-
-  const formatarData = (dateString) => {
-    const [year, month, day] = dateString.split('-').map(Number);
-    const date = new Date(year, month - 1, day);
-
-    const weekday = diasSemana[date.getDay()];
-    const monthName = meses[date.getMonth()];
-
-    return `${weekday}, ${day} de ${monthName} de ${year}`;
-  };
-
-  const getStatus = (date) => {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    const today = `${year}-${month}-${day}`;
-
-    if (markedDates[date]?.selectedColor === 'green') {
-      return { text: 'Presença', color: 'green' };
-    }
-    if (markedDates[date]?.selectedColor === 'red') {
-      return { text: 'Falta', color: 'red' };
-    }
-
-    if (date < today) {
-      return { text: 'Aguardando', color: colors.yellow };
-    } else if (date === today) {
-      return { text: 'Aguardando', color: colors.yellow };
-    } else {
-      return { text: 'Previsto', color: colors.darkGray };
-    }
-  };
-
   const dashboardCards = [
-    { label: "Minha Turma", value: "Turma 101" },
-    { label: "Próxima Aula", value: "Matemática - 10:00" },
-    { label: "Total de Aulas", value: "32" },
-    { label: "Aulas Assistidas", value: "28" },
+    { label: "Histórico de Presenças", value: "Veja suas presenças e faltas", icon: ClockCounterClockwiseIcon, iconColor: "#7242df", backColor: "#edeaff", function: () => navigation.navigate('PresencaAlunoScreen') },
+    { label: "Minhas Notas", value: "Consulte seu desempenho", icon: ChartBarIcon, iconColor: "#009466", backColor: "#d0fae4", function: () => navigation.navigate('NotasAlunoScreen') },
+    { label: "Calendário", value: "Próximas aulas e eventos", icon: CalendarIcon, iconColor: "#d97501", backColor: "#fbf4c9", function: () => navigation.navigate('CalendarioAlunoScreen') },
   ];
 
   let numColumns = 1;
-  if (width >= 1600) numColumns = 4;
+  if (width >= 1200) numColumns = 3;
   else if (width >= 750) numColumns = 2;
 
   return (
@@ -144,7 +90,9 @@ export default function AlunoDashboard({ setUserProfile }) {
               </View>
               <View style={styles.sidebarNav}>
                 <SidebarButton label="Dashboard" active icon={<HouseIcon size={22} weight="regular" color="#374151" />} onPress={() => navigation.navigate('AlunoDashboard')} />
+                <SidebarButton label="Presenças" icon={<ClockCounterClockwiseIcon size={22} weight="regular" color="#374151" />} onPress={() => navigation.navigate('PresencaAlunoScreen')} />
                 <SidebarButton label="Notas" icon={<NoteIcon size={22} weight="regular" color="#374151" />} onPress={() => navigation.navigate('NotasAlunoScreen')} />
+                <SidebarButton label="Calendário" icon={<CalendarBlankIcon size={22} weight="regular" color="#374151" />} onPress={() => navigation.navigate('CalendarioAlunoScreen')} />
               </View>
             </View>
             <View style={styles.sidebarBottom}>
@@ -168,6 +116,11 @@ export default function AlunoDashboard({ setUserProfile }) {
             </View>
 
             <ScrollView style={styles.scrollArea} contentContainerStyle={{ paddingBottom: 24 }}>
+              <TouchableOpacity style={[styles.card, { backgroundColor: "#2563ea", alignItems: 'flex-start', marginBottom: 16, padding: 40, gap: 4, cursor: "default" }]} activeOpacity={1}>
+                <Text style={{ fontSize: 14, color: colors.white, fontWeight: "thin", opacity: 0.8 }}>Você está matriculado em:</Text>
+                <Text style={{ fontSize: 40, fontWeight: "bold", color: colors.white }}>{turma}</Text>
+              </TouchableOpacity>
+
               <FlatList
                 data={dashboardCards}
                 keyExtractor={(_, idx) => idx.toString()}
@@ -175,45 +128,16 @@ export default function AlunoDashboard({ setUserProfile }) {
                 key={numColumns}
                 contentContainerStyle={styles.cardsRow}
                 renderItem={({ item }) => (
-                  <DashboardCard label={item.label} value={item.value} />
+                  <TouchableOpacity key={item.label} style={styles.card} onPress={item.function}>
+                    <item.icon size={32} color={item.iconColor} weight="bold" style={{ backgroundColor: item.backColor, padding: 8, borderRadius: 50, marginBottom: 8 }} />
+                    <Text style={styles.cardLabel}>{item.label}</Text>
+                    <Text style={styles.cardValue}>{item.value}</Text>
+                  </TouchableOpacity>
                 )}
                 columnWrapperStyle={numColumns > 1 ? { gap: 16 } : undefined}
                 showsVerticalScrollIndicator={false}
                 scrollEnabled={false}
               />
-
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                <View style={{ flex: 1, marginRight: 16 }}>
-                  {/* Calendário */}
-                  <Calendar
-                    current={hoje}
-                    style={styles.calendario}
-                    onDayPress={(day) => setSelectedDate(day.dateString)}
-                    markedDates={markedDates}
-                    theme={{
-                      selectedDayTextColor: colors.white,
-                      todayTextColor: colors.darkGray,
-                      arrowColor: colors.darkGray,
-                      textDayFontFamily: fontFamily.roboto.medium,
-                      textMonthFontFamily: fontFamily.roboto.bold,
-                      textDayHeaderFontFamily: fontFamily.roboto.regular,
-                      textDayFontSize: 16,
-                      textMonthFontSize: 18,
-                      textDayHeaderFontSize: 14,
-                    }}
-                    showSixWeeks={true}
-                  />
-                </View>
-
-                <View style={{ flex: 0.4 }}>
-                  <View style={styles.statusBox}>
-                    <Text style={styles.statusDate}>{formatarData(selectedDate)}</Text>
-                    <Text style={[styles.statusTexto, { color: getStatus(selectedDate).color }]}>
-                      {getStatus(selectedDate).text}
-                    </Text>
-                  </View>
-                </View>
-              </View>
             </ScrollView>
           </View>
           {/* Logout Modal */}
@@ -267,15 +191,6 @@ function SidebarButton({ label, icon, active, onPress }) {
       <View style={[styles.sidebarBtnIcon, active && styles.sidebarBtnIconActive]}>{icon}</View>
       <Text style={[styles.sidebarBtnText, active && styles.sidebarBtnTextActive]}>{label}</Text>
     </TouchableOpacity>
-  );
-}
-
-function DashboardCard({ label, value }) {
-  return (
-    <View style={styles.card}>
-      <Text style={styles.cardLabel}>{label}</Text>
-      <Text style={styles.cardValue}>{value}</Text>
-    </View>
   );
 }
 
@@ -450,44 +365,19 @@ const styles = StyleSheet.create({
     padding: 18,
     marginBottom: 8,
     gap: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 2,
   },
   cardLabel: {
-    color: '#6b7280',
-    fontSize: 14,
-    fontWeight: '500',
-    marginBottom: 4,
+    color: '#1f2937',
+    fontSize: 22,
+    fontWeight: 'bold',
+    marginBottom: 2,
   },
   cardValue: {
-    color: '#1f2937',
-    fontSize: 28,
-    fontWeight: 'bold',
-  },
-  calendario: {
-    borderRadius: 8,
-    elevation: 2,
-    backgroundColor: colors.white,
-    borderWidth: 1,
-    borderColor: colors.lightGray
-  },
-  statusBox: {
-    padding: 15,
-    borderRadius: 8,
-    backgroundColor: colors.white,
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: colors.lightGray,
-    alignItems: 'center'
-  },
-  statusDate: {
-    fontSize: 18,
-    fontFamily: fontFamily.roboto.medium,
-    color: colors.darkGray,
-    marginBottom: 18,
-    textAlign: 'center'
-  },
-  statusTexto: {
-    fontSize: 18,
-    fontFamily: fontFamily.roboto.medium,
-    textAlign: 'center'
+    color: '#6b7280',
+    fontSize: 16,
+    fontWeight: '500',
   },
 });
