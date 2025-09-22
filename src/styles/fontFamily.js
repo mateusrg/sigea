@@ -1,4 +1,3 @@
-// src/styles/fontFamily.js
 export const fontFamily = {
     inter: {
         thin: "Inter_100Thin",

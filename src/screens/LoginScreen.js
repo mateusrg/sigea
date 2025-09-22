@@ -55,7 +55,6 @@ export default function LoginScreen({ navigation, setUserProfile }) {
                 else if (result.profile.papel === 2) papelString = 'professor';
                 setUserProfile(papelString);
 
-                // Salvar dados do usuário incluindo o uid
                 const userData = { 
                     ...result.profile, 
                     uid: result.uid 

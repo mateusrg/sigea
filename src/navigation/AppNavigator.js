@@ -64,10 +64,27 @@ export default function AppNavigator({ userProfile, setUserProfile }) {
           </>
         ) : (
           <>
-            <Stack.Screen name="AlunoDashboard" component={AlunoDashboard} />
-            <Stack.Screen name="CalendarioAlunoScreen" component={require('../screens/Aluno/CalendarioAlunoScreen').default} />
-            <Stack.Screen name="NotasAlunoScreen" component={require('../screens/Aluno/NotasAlunoScreen').default} />
-            <Stack.Screen name="PresencaAlunoScreen" component={require('../screens/Aluno/PresencaAlunoScreen').default} />
+            <Stack.Screen name="AlunoDashboard">
+              {props => <AlunoDashboard {...props} setUserProfile={setUserProfile} />}
+            </Stack.Screen>
+            <Stack.Screen name="CalendarioAlunoScreen">
+              {props => {
+                const CalendarioAlunoScreen = require('../screens/Aluno/CalendarioAlunoScreen').default;
+                return <CalendarioAlunoScreen {...props} setUserProfile={setUserProfile} />;
+              }}
+            </Stack.Screen>
+            <Stack.Screen name="NotasAlunoScreen">
+              {props => {
+                const NotasAlunoScreen = require('../screens/Aluno/NotasAlunoScreen').default;
+                return <NotasAlunoScreen {...props} setUserProfile={setUserProfile} />;
+              }}
+            </Stack.Screen>
+            <Stack.Screen name="PresencaAlunoScreen">
+              {props => {
+                const PresencaAlunoScreen = require('../screens/Aluno/PresencaAlunoScreen').default;
+                return <PresencaAlunoScreen {...props} setUserProfile={setUserProfile} />;
+              }}
+            </Stack.Screen>
           </>
         )}
       </Stack.Navigator>

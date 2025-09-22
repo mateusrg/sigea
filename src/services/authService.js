@@ -161,7 +161,6 @@ const editarProfessor = async (idProfessor, novoNome) => {
   try {
     const professorRef = doc(db, "professores", idProfessor);
     await updateDoc(professorRef, { nome: novoNome });
-    console.log("Professor atualizado com sucesso!");
   } catch (error) {
     console.error("Erro ao atualizar professor:", error);
     throw error;
@@ -215,12 +214,10 @@ export async function removerProfessorDaTurma(idTurma, idProfessor) {
 
     const profDoc = await profRef.get();
     if (!profDoc.exists) {
-      console.log('Professor não encontrado nesta turma.');
       return false;
     }
 
     await profRef.delete();
-    console.log('Professor removido da turma com sucesso!');
     return true;
   } catch (error) {
     console.error('Erro ao remover professor da turma:', error);
