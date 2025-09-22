@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, FlatList, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, FlatList, Dimensions, ActivityIndicator } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { fontFamily } from '../../styles/fontFamily';
 const interFont = fontFamily?.inter?.regular || fontFamily?.poppins?.regular || 'System';
@@ -7,60 +7,17 @@ import { colors } from '../../styles/colors';
 import { HouseIcon, ChalkboardTeacherIcon, ClipboardTextIcon, NoteIcon, GearIcon, SignOutIcon, BellIcon, UserIcon, UserCircleIcon, UsersIcon, ClockIcon, CaretDownIcon } from 'phosphor-react-native';
 import { db } from '../../services/firebase';
 
-const larguraSidebar = 220;
-
 import { useWindowDimensions } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Modal } from 'react-native';
 
-const sampleTurmas = [
-  { 
-    id: '1', 
-    nome: 'Matemática 101', 
-    alunos: 35, 
-    horario: '08:00 - 09:40',
-    periodo: 'Manhã'
-  },
-  { 
-    id: '2', 
-    nome: 'Ciências 201', 
-    alunos: 28, 
-    horario: '10:30 - 12:10',
-    periodo: 'Manhã'
-  },
-  { 
-    id: '3', 
-    nome: 'História 301', 
-    alunos: 32, 
-    horario: '13:00 - 14:40',
-    periodo: 'Tarde'
-  },
-  { 
-    id: '4', 
-    nome: 'Inglês 101', 
-    alunos: 25, 
-    horario: '15:00 - 16:40',
-    periodo: 'Tarde'
-  },
-  { 
-    id: '5', 
-    nome: 'Física 202', 
-    alunos: 30, 
-    horario: '19:00 - 20:40',
-    periodo: 'Noite'
-  },
-  { 
-    id: '6', 
-    nome: 'Química 102', 
-    alunos: 22, 
-    horario: '21:00 - 22:40',
-    periodo: 'Noite'
-  },
-];
+const larguraSidebar = 220;
 
-export default function TurmasScreen({ professorId, onSelectTurma }) {
+export default function TurmasScreen({ professorId, onSelectTurma, setUserProfile }) {
   const [userName, setUserName] = useState('');
-  const [turmas, setTurmas] = useState(sampleTurmas);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [turmas, setTurmas] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [filtro, setFiltro] = useState('Ordem Alfabética');
   const [showDropdown, setShowDropdown] = useState(false);
   const { width } = useWindowDimensions();
@@ -78,27 +35,100 @@ export default function TurmasScreen({ professorId, onSelectTurma }) {
         if (userData) {
           const userObj = JSON.parse(userData);
           setUserName(userObj.nome || '');
+          setCurrentUser(userObj);
+        } else {
+          setLoading(false);
         }
       } catch (error) {
+        console.error('Erro ao buscar usuário:', error);
         setUserName('');
+        setLoading(false);
       }
     };
     fetchUser();
   }, []);
 
   useEffect(() => {
-    if (professorId) {
-      const unsubscribe = db.collection('turmas')
-        .where('professorId', '==', professorId)
-        .onSnapshot(snapshot => {
-          const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-          if (list.length > 0) {
-            setTurmas(list);
-          }
-        });
-      return unsubscribe;
+    if (currentUser) {
+      const userId = currentUser.uid || currentUser.id;
+      if (userId) {
+        loadTurmasDoProf();
+      } else {
+        findUserByName();
+      }
     }
-  }, [professorId]);
+  }, [currentUser]);
+
+  const findUserByName = async () => {
+    try {
+      const userQuery = await db.collection('users')
+        .where('nome', '==', currentUser.nome)
+        .where('papel', '==', currentUser.papel)
+        .get();
+      
+      if (!userQuery.empty) {
+        const userDoc = userQuery.docs[0];
+        const userId = userDoc.id;
+        const updatedUser = { ...currentUser, uid: userId };
+        setCurrentUser(updatedUser);
+        await AsyncStorage.setItem('user', JSON.stringify(updatedUser));
+        loadTurmasDoProf(userId);
+      } else {
+        setLoading(false);
+      }
+    } catch (error) {
+      console.error('Erro ao buscar usuário pelo nome:', error);
+      setLoading(false);
+    }
+  };
+
+  const loadTurmasDoProf = async (overrideUserId = null) => {
+    try {
+      setLoading(true);
+      const userId = overrideUserId || currentUser.uid || currentUser.id;
+      const allTurmasSnapshot = await db.collection('turmas').get();
+      const turmasDoProf = [];
+      for (const turmaDoc of allTurmasSnapshot.docs) {
+        const allProfessoresSnapshot = await db
+          .collection('turmas')
+          .doc(turmaDoc.id)
+          .collection('professores')
+          .get();
+        const professoresSnapshot = await db
+          .collection('turmas')
+          .doc(turmaDoc.id)
+          .collection('professores')
+          .where('idProfessor', '==', userId)
+          .get();
+        
+        if (!professoresSnapshot.empty) {
+          const turmaData = turmaDoc.data();
+          
+          const alunosSnapshot = await db
+            .collection('turmas')
+            .doc(turmaDoc.id)
+            .collection('alunos')
+            .get();
+
+          turmasDoProf.push({ 
+            id: turmaDoc.id, 
+            nome: turmaData.nome,
+            turno: turmaData.turno,
+            alunos: alunosSnapshot.size,
+            periodo: turmaData.turno === 'Manhã' ? 'Manhã' : 
+                    turmaData.turno === 'Tarde' ? 'Tarde' : 
+                    turmaData.turno === 'Noite' ? 'Noite' : 'Manhã'
+          });
+        }
+      }
+      setTurmas(turmasDoProf);
+    } catch (error) {
+      console.error('Erro ao carregar turmas do professor:', error);
+      setTurmas([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filteredTurmas = React.useMemo(() => {
     let filtered = [...turmas];
@@ -135,7 +165,7 @@ export default function TurmasScreen({ professorId, onSelectTurma }) {
             </View>
             <View style={styles.sidebarNav}>
               <SidebarButton label="Dashboard" icon={<HouseIcon size={22} weight="regular" color="#374151" />} onPress={() => navigation.navigate('ProfessorDashboard')} />
-              <SidebarButton label="Aulas" active icon={<ChalkboardTeacherIcon size={22} weight="regular" color="#374151" />} onPress={() => navigation.navigate('TurmasScreen')} />
+              <SidebarButton label="Turmas" active icon={<ChalkboardTeacherIcon size={22} weight="regular" color="#374151" />} onPress={() => navigation.navigate('TurmasScreen')} />
               <SidebarButton label="Chamada" icon={<ClipboardTextIcon size={22} weight="regular" color="#374151" />} onPress={() => navigation.navigate('PresencaScreen')} />
               <SidebarButton label="Notas" icon={<NoteIcon size={22} weight="regular" color="#374151" />} onPress={() => navigation.navigate('NotasScreen')} />
             </View>
@@ -159,41 +189,58 @@ export default function TurmasScreen({ professorId, onSelectTurma }) {
           <ScrollView style={styles.scrollArea} contentContainerStyle={{ paddingBottom: 24 }}>
             <View style={styles.titleRow}>
               <Text style={styles.pageTitle}>Minhas Turmas</Text>
-              <View style={styles.selectWrapper}>
-                <TouchableOpacity 
-                  style={styles.selectButton} 
-                  onPress={() => setShowDropdown(!showDropdown)}
-                  activeOpacity={1}
-                >
-                  <Text style={styles.selectButtonText}>{filtro}</Text>
-                  <CaretDownIcon 
-                    size={16} 
-                    color="#374151" 
-                    weight="regular" 
-                    style={{ 
-                      transform: [{ rotate: showDropdown ? '180deg' : '0deg' }] 
-                    }}
-                  />
-                </TouchableOpacity>
-              </View>
+              {!loading && (
+                <View style={styles.selectWrapper}>
+                  <TouchableOpacity 
+                    style={styles.selectButton} 
+                    onPress={() => setShowDropdown(!showDropdown)}
+                    activeOpacity={1}
+                  >
+                    <Text style={styles.selectButtonText}>{filtro}</Text>
+                    <CaretDownIcon 
+                      size={16} 
+                      color="#374151" 
+                      weight="regular" 
+                      style={{ 
+                        transform: [{ rotate: showDropdown ? '180deg' : '0deg' }] 
+                      }}
+                    />
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
             
-            <FlatList
-              data={filteredTurmas}
-              keyExtractor={(item) => item.id}
-              numColumns={numColumns}
-              key={numColumns}
-              contentContainerStyle={styles.turmasGrid}
-              renderItem={({ item }) => (
-                <TurmaCard 
-                  turma={item} 
-                  onPress={() => onSelectTurma && onSelectTurma(item)}
-                />
-              )}
-              columnWrapperStyle={numColumns > 1 ? { gap: 24 } : undefined}
-              showsVerticalScrollIndicator={false}
-              scrollEnabled={false}
-            />
+            {loading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#2563eb" />
+                <Text style={styles.loadingText}>Carregando suas turmas...</Text>
+              </View>
+            ) : filteredTurmas.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyStateTitle}>Nenhuma turma encontrada</Text>
+                <Text style={styles.emptyStateText}>
+                  Você não está cadastrado em nenhuma turma ainda.
+                </Text>
+              </View>
+            ) : (
+              <FlatList
+                data={filteredTurmas}
+                keyExtractor={(item) => item.id}
+                numColumns={numColumns}
+                key={numColumns}
+                contentContainerStyle={styles.turmasGrid}
+                renderItem={({ item }) => (
+                  <TurmaCard 
+                    turma={item} 
+                    onPress={() => onSelectTurma && onSelectTurma(item)}
+                    navigation={navigation}
+                  />
+                )}
+                columnWrapperStyle={numColumns > 1 ? { gap: 24 } : undefined}
+                showsVerticalScrollIndicator={false}
+                scrollEnabled={false}
+              />
+            )}
           </ScrollView>
           
           {showDropdown && (
@@ -252,15 +299,20 @@ export default function TurmasScreen({ professorId, onSelectTurma }) {
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={{ backgroundColor: '#ef4444', padding: 10, borderRadius: 8, minWidth: 80, alignItems: 'center' }}
-                  onPress={() => {
+                  onPress={async () => {
                     setLogoutModalVisible(false);
-                    AsyncStorage.removeItem('user');
-                    AsyncStorage.removeItem('token');
-                    if (typeof setUserProfile === 'function') setUserProfile(null);
-                    navigation.reset({
-                      index: 0,
-                      routes: [{ name: 'Login' }],
-                    });
+                    try {
+                      await AsyncStorage.removeItem('user');
+                      await AsyncStorage.removeItem('token');
+                      if (typeof setUserProfile === 'function') {
+                        setUserProfile(null);
+                      }
+                    } catch (error) {
+                      console.error('Erro durante logout:', error);
+                      if (typeof setUserProfile === 'function') {
+                        setUserProfile(null);
+                      }
+                    }
                   }}
                 >
                   <Text style={{ color: '#fff', fontWeight: 'bold' }}>Sair</Text>
@@ -283,7 +335,7 @@ function SidebarButton({ label, icon, active, onPress }) {
   );
 }
 
-function TurmaCard({ turma, onPress }) {
+function TurmaCard({ turma, onPress, navigation }) {
   return (
     <View style={styles.turmaCard}>
       <View style={styles.turmaCardContent}>
@@ -291,21 +343,23 @@ function TurmaCard({ turma, onPress }) {
         <View style={styles.turmaCardInfo}>
           <View style={styles.turmaCardRow}>
             <UsersIcon size={16} color="#6b7280" weight="regular" />
-            <Text style={styles.turmaCardText}>{turma.alunos} Alunos</Text>
+            <Text style={styles.turmaCardText}>{turma.alunos} Aluno{turma.alunos != 1 ? 's' : ''}</Text>
           </View>
           <View style={styles.turmaCardRow}>
             <ClockIcon size={16} color="#6b7280" weight="regular" />
-            <Text style={styles.turmaCardText}>{turma.horario}</Text>
+            <Text style={styles.turmaCardText}>{turma.turno}</Text>
           </View>
         </View>
       </View>
-      <TouchableOpacity 
-        style={styles.turmaCardButton} 
-        onPress={onPress}
-        activeOpacity={0.8}
-      >
-        <Text style={styles.turmaCardButtonText}>Acessar Turma</Text>
-      </TouchableOpacity>
+      <View style={styles.turmaCardActions}>
+        <TouchableOpacity 
+          style={styles.turmaCardButton} 
+          onPress={() => navigation.navigate('AulasTurmaScreen', { turmaId: turma.id, turmaNome: turma.nome })}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.turmaCardButtonText}>Acessar Turma</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -318,14 +372,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     flexDirection: 'row',
-    minHeight: '100%',
   },
   sidebar: {
     position: 'absolute',
     left: 0,
     top: 0,
+    bottom: 0,
     zIndex: 10,
-    height: '100vh',
     width: larguraSidebar,
     backgroundColor: '#fff',
     borderRightWidth: 1,
@@ -387,7 +440,7 @@ const styles = StyleSheet.create({
   },
   main: {
     flex: 1,
-    paddingLeft: larguraSidebar,
+    marginLeft: larguraSidebar,
     flexDirection: 'column',
     backgroundColor: '#fff',
   },
@@ -427,7 +480,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   scrollArea: {
-    flex: 1,
+    height: 'calc(100vh - 80px)',
     padding: 32,
     backgroundColor: '#f8f9fa',
   },
@@ -508,6 +561,7 @@ const styles = StyleSheet.create({
   turmaCard: {
     flex: 1,
     minWidth: 280,
+    maxWidth: 400,
     backgroundColor: '#fff',
     borderRadius: 12,
     padding: 24,
@@ -521,6 +575,9 @@ const styles = StyleSheet.create({
   },
   turmaCardContent: {
     marginBottom: 16,
+  },
+  turmaCardActions: {
+    gap: 8,
   },
   turmaCardTitle: {
     fontSize: 20,
@@ -548,12 +605,52 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 16,
     alignItems: 'center',
-    marginTop: 8,
+    flexDirection: 'row',
+    justifyContent: 'center',
   },
   turmaCardButtonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
     fontFamily: fontFamily.inter.semiBold || 'System',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 64,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#6b7280',
+    fontFamily: fontFamily.inter.regular || 'System',
+  },
+  emptyState: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  emptyStateTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#1f2937',
+    fontFamily: fontFamily.inter.bold || 'System',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptyStateText: {
+    fontSize: 15,
+    color: '#6b7280',
+    fontFamily: fontFamily.inter.regular || 'System',
+    textAlign: 'center',
+    lineHeight: 22,
   },
 });

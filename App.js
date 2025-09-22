@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, View, ActivityIndicator } from 'react-native';
 import { Provider as PaperProvider } from 'react-native-paper';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import AppNavigator from './src/navigation/AppNavigator';
 import LoginScreen from './src/screens/LoginScreen';
 
@@ -123,19 +124,22 @@ export default function App() {
   const [userProfile, setUserProfile] = useState(null);
 
   React.useEffect(() => {
-    const usuarioSalvo = localStorage.getItem('user');
-    if (usuarioSalvo) {
+    const checkUser = async () => {
       try {
-        const objetoUsuario = JSON.parse(usuarioSalvo);
-        let papelString = 'aluno';
-        if (objetoUsuario.papel === 1) papelString = 'admin';
-        else if (objetoUsuario.papel === 2) papelString = 'professor';
-        setUserProfile(papelString);
+        const usuarioSalvo = await AsyncStorage.getItem('user');
+        if (usuarioSalvo) {
+          const objetoUsuario = JSON.parse(usuarioSalvo);
+          let papelString = 'aluno';
+          if (objetoUsuario.papel === 1) papelString = 'admin';
+          else if (objetoUsuario.papel === 2) papelString = 'professor';
+          setUserProfile(papelString);
+        }
       } catch (e) {
-        localStorage.removeItem('user');
-        localStorage.removeItem('token');
+        await AsyncStorage.removeItem('user');
+        await AsyncStorage.removeItem('token');
       }
-    }
+    };
+    checkUser();
   }, []);
 
   if (!fontsLoaded) {

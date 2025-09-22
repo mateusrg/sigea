@@ -4,8 +4,17 @@ import { createStackNavigator } from '@react-navigation/stack';
 
 import LoginScreen from '../screens/LoginScreen';
 import AdminDashboard from '../screens/Admin/AdminDashboard';
+import AlunosScreen from '../screens/Admin/AlunosScreen';
+import ProfessoresScreen from '../screens/Admin/ProfessoresScreen';
+import TurmasScreenAdmin from '../screens/Admin/TurmasScreen';
 import ProfessorDashboard from '../screens/Professor/ProfessorDashboard';
 import AlunoDashboard from '../screens/Aluno/AlunoDashboard';
+import TurmasScreen from '../screens/Professor/TurmasScreen';
+import AulasTurmaScreen from '../screens/Professor/AulasTurmaScreen';
+import PresencaScreen from '../screens/Professor/PresencaScreen';
+import NotasScreen from '../screens/Professor/NotasScreen';
+import AlunosTurmaScreen from '../screens/Professor/AlunosTurmaScreen';
+import NotasAlunoScreen from '../screens/Aluno/NotasAlunoScreen';
 
 const Stack = createStackNavigator();
 
@@ -19,25 +28,46 @@ export default function AppNavigator({ userProfile, setUserProfile }) {
           </Stack.Screen>
         ) : userProfile === 'admin' ? (
           <>
-            <Stack.Screen name="AdminDashboard" component={AdminDashboard} />
-            <Stack.Screen name="AlunosScreen" component={require('../screens/Admin/AlunosScreen').default} />
-            <Stack.Screen name="ProfessoresScreen" component={require('../screens/Admin/ProfessoresScreen').default} />
-            <Stack.Screen name="TurmasScreen" component={require('../screens/Admin/TurmasScreen').default} />
+            <Stack.Screen name="AdminDashboard">
+              {props => <AdminDashboard {...props} setUserProfile={setUserProfile} />}
+            </Stack.Screen>
+            <Stack.Screen name="AlunosScreen">
+              {props => <AlunosScreen {...props} setUserProfile={setUserProfile} />}
+            </Stack.Screen>
+            <Stack.Screen name="ProfessoresScreen">
+              {props => <ProfessoresScreen {...props} setUserProfile={setUserProfile} />}
+            </Stack.Screen>
+            <Stack.Screen name="TurmasScreen">
+              {props => <TurmasScreenAdmin {...props} setUserProfile={setUserProfile} />}
+            </Stack.Screen>
           </>
         ) : userProfile === 'professor' ? (
           <>
             <Stack.Screen name="ProfessorDashboard">
               {props => <ProfessorDashboard {...props} setUserProfile={setUserProfile} />}
             </Stack.Screen>
-            <Stack.Screen name="TurmasScreen" component={require('../screens/Professor/TurmasScreen').default} />
-            <Stack.Screen name="PresencaScreen" component={require('../screens/Professor/PresencaScreen').default} />
-            <Stack.Screen name="NotasScreen" component={require('../screens/Professor/NotasScreen').default} />
-            <Stack.Screen name="AlunosTurmaScreen" component={require('../screens/Professor/AlunosTurmaScreen').default} />
+            <Stack.Screen name="TurmasScreen">
+              {props => <TurmasScreen {...props} setUserProfile={setUserProfile} />}
+            </Stack.Screen>
+            <Stack.Screen name="AulasTurmaScreen">
+              {props => <AulasTurmaScreen {...props} setUserProfile={setUserProfile} />}
+            </Stack.Screen>
+            <Stack.Screen name="PresencaScreen">
+              {props => <PresencaScreen {...props} setUserProfile={setUserProfile} />}
+            </Stack.Screen>
+            <Stack.Screen name="NotasScreen">
+              {props => <NotasScreen {...props} setUserProfile={setUserProfile} />}
+            </Stack.Screen>
+            <Stack.Screen name="AlunosTurmaScreen">
+              {props => <AlunosTurmaScreen {...props} setUserProfile={setUserProfile} />}
+            </Stack.Screen>
           </>
         ) : (
           <>
             <Stack.Screen name="AlunoDashboard" component={AlunoDashboard} />
+            <Stack.Screen name="CalendarioAlunoScreen" component={require('../screens/Aluno/CalendarioAlunoScreen').default} />
             <Stack.Screen name="NotasAlunoScreen" component={require('../screens/Aluno/NotasAlunoScreen').default} />
+            <Stack.Screen name="PresencaAlunoScreen" component={require('../screens/Aluno/PresencaAlunoScreen').default} />
           </>
         )}
       </Stack.Navigator>
