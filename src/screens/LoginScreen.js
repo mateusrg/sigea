@@ -5,6 +5,7 @@ import {
     Image
 } from 'react-native';
 import { TextInput as PaperTextInput, Button as PaperButton, Text as PaperText, Dialog, Portal, HelperText, ActivityIndicator } from 'react-native-paper';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { fontFamily } from '../styles/fontFamily';
 import { colors } from '../styles/colors';
@@ -54,8 +55,13 @@ export default function LoginScreen({ navigation, setUserProfile }) {
                 else if (result.profile.papel === 2) papelString = 'professor';
                 setUserProfile(papelString);
 
-                localStorage.setItem('user', JSON.stringify(result.profile));
-                localStorage.setItem('token', result.token);
+                // Salvar dados do usuário incluindo o uid
+                const userData = { 
+                    ...result.profile, 
+                    uid: result.uid 
+                };
+                await AsyncStorage.setItem('user', JSON.stringify(userData));
+                await AsyncStorage.setItem('token', result.token);
             } else {
                 setBackendError(result.message || 'Usuário ou senha inválidos.');
             }

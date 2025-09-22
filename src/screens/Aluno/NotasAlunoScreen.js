@@ -13,7 +13,7 @@ const larguraSidebar = 220;
 
 import { getNotasAluno, getAlunoIdPorNome } from '../../services/authService';
 
-export default function NotasAluno() {
+export default function NotasAluno({ setUserProfile }) {
   const [userName, setUserName] = useState('');
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const { width } = useWindowDimensions();
@@ -98,12 +98,21 @@ export default function NotasAluno() {
 
   const handleLogout = async () => {
     setLogoutModalVisible(false);
-    await AsyncStorage.removeItem('user');
-    await AsyncStorage.removeItem('token');
-    navigation.reset({
-      index: 0,
-      routes: [{ name: 'Login' }],
-    });
+    try {
+      await AsyncStorage.removeItem('user');
+      await AsyncStorage.removeItem('token');
+      // Reset the user profile in the parent component
+      if (typeof setUserProfile === 'function') {
+        setUserProfile(null);
+      }
+      // Don't try to navigate - let App.js handle the screen transition
+    } catch (error) {
+      console.error('Error during logout:', error);
+      // Still try to reset user profile even if AsyncStorage fails
+      if (typeof setUserProfile === 'function') {
+        setUserProfile(null);
+      }
+    }
   };
 
   let numColumns = 1;
