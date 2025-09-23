@@ -157,15 +157,17 @@ export async function nomeProfessorExiste(nome) {
   return !snapshot.empty;
 }
 
-const editarProfessor = async (idProfessor, novoNome) => {
+export async function editarProfessor(idProfessor, novoNome) {
   try {
-    const professorRef = doc(db, "professores", idProfessor);
-    await updateDoc(professorRef, { nome: novoNome });
+    await db.collection('users').doc(idProfessor).update({
+      nome: novoNome
+    });
+    return true;
   } catch (error) {
     console.error("Erro ao atualizar professor:", error);
     throw error;
   }
-};
+}
 
 export async function excluirProfessor(idProfessor) {
   try {

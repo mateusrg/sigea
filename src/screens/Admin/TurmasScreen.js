@@ -79,7 +79,10 @@ export default function Turmas({ setUserProfile }) {
       setNovoTurno('Manhã');
       setModalTurmaVisible(false);
 
-      setFilteredTurmas([...filteredTurmas, { id: resultado.id, nome: novoNome, students: 0 }]);
+      setFilteredTurmas([
+        ...filteredTurmas,
+        { id: resultado.id, nome: novoNome, turno: novoTurno, students: 0 }
+      ]);
     } catch (err) {
       console.error('Erro ao criar turma:', err);
       alert('Erro ao criar turma. Tente novamente.');
